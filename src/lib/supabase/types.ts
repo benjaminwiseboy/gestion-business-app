@@ -33,6 +33,8 @@ type SoftDelete = {
   deleted_at: string | null;
 };
 
+type EmptyRelationships = [];
+
 export interface Database {
   public: {
     Tables: {
@@ -44,8 +46,18 @@ export interface Database {
           default_rate_to_xof: number;
           created_at: string;
         };
-        Insert: never;
-        Update: never;
+        Insert: {
+          code: string;
+          symbol: string;
+          decimals?: number;
+          default_rate_to_xof?: number;
+        };
+        Update: {
+          symbol?: string;
+          decimals?: number;
+          default_rate_to_xof?: number;
+        };
+        Relationships: EmptyRelationships;
       };
       user_settings: {
         Row: {
@@ -62,6 +74,7 @@ export interface Database {
           usd_to_xof_rate?: number;
           default_currency?: string;
         };
+        Relationships: EmptyRelationships;
       };
       persons: {
         Row: {
@@ -94,6 +107,7 @@ export interface Database {
           notes?: string | null;
           deleted_at?: string | null;
         };
+        Relationships: EmptyRelationships;
       };
       loans: {
         Row: {
@@ -138,6 +152,7 @@ export interface Database {
           notes?: string | null;
           deleted_at?: string | null;
         };
+        Relationships: EmptyRelationships;
       };
       transactions: {
         Row: {
@@ -179,6 +194,7 @@ export interface Database {
           notes?: string | null;
           deleted_at?: string | null;
         };
+        Relationships: EmptyRelationships;
       };
       change_log: {
         Row: {
@@ -190,8 +206,16 @@ export interface Database {
           diff: Json;
           changed_at: string;
         };
-        Insert: never;
+        Insert: {
+          id?: string;
+          owner_id: string;
+          entity_type: string;
+          entity_id: string;
+          action: ChangeLogAction;
+          diff?: Json;
+        };
         Update: never;
+        Relationships: EmptyRelationships;
       };
     };
     Views: {
@@ -204,10 +228,12 @@ export interface Database {
           repaid_amount: number;
           remaining_amount: number;
         };
+        Relationships: EmptyRelationships;
       };
     };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 }
 
