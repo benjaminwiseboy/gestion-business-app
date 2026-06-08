@@ -8,10 +8,15 @@ import type {
   LinkedEntityType,
   Tables,
   TablesInsert,
+  TablesUpdate,
 } from "@/lib/supabase/types";
 
 type Transaction = Tables<"transactions">;
 type Loan = Tables<"loans">;
+
+export type TransactionWithPerson = Transaction & {
+  person: { id: string; full_name: string } | null;
+};
 
 const TRANSACTIONS_KEY = ["transactions"] as const;
 const LOANS_KEY = ["loans"] as const;
@@ -22,16 +27,86 @@ function client() {
 }
 
 export function useTransactions() {
-  return useQuery<Transaction[]>({
+  return useQuery<TransactionWithPerson[]>({
     queryKey: TRANSACTIONS_KEY,
     queryFn: async () => {
       const { data, error } = await client()
         .from("transactions")
-        .select("*")
+        .select("*, person:persons(id, full_name)")
         .is("deleted_at", null)
-        .order("occurred_at", { ascending: false });
+        .order("occurred_at", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as TransactionWithPerson[];
+    },
+  });
+}
+
+export function useTransaction(id: string | null | undefined) {
+  return useQuery<TransactionWithPerson | null>({
+    queryKey: [...TRANSACTIONS_KEY, id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      if (!id) return null;
+      const { data, error } = await client()
+        .from("transactions")
+        .select("*, person:persons(id, full_name)")
+        .eq("id", id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      return data as unknown as TransactionWithPerson | null;
+    },
+  });
+}
+
+/** Create a standalone transaction (fee / adjustment / manual entry). */
+export function useCreateTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: Omit<TablesInsert<"transactions">, "owner_id">,
+    ) => {
+      const { data, error } = await client()
+        .from("transactions")
+        .insert(input)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: LOAN_REMAINING_KEY });
+      qc.invalidateQueries({ queryKey: LOANS_KEY });
+    },
+  });
+}
+
+export function useUpdateTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: TablesUpdate<"transactions">;
+    }) => {
+      const { data, error } = await client()
+        .from("transactions")
+        .update(input)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: [...TRANSACTIONS_KEY, variables.id] });
+      qc.invalidateQueries({ queryKey: LOAN_REMAINING_KEY });
+      qc.invalidateQueries({ queryKey: LOANS_KEY });
     },
   });
 }

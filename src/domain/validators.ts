@@ -111,6 +111,21 @@ export const TransactionKindSchema = z.enum([
   "fee",
   "adjustment",
 ]);
+export type TransactionKindInput = z.infer<typeof TransactionKindSchema>;
+
+export const TRANSACTION_KIND_LABELS: Record<TransactionKindInput, string> = {
+  loan_disbursement: "Décaissement de prêt",
+  repayment: "Remboursement",
+  land_payment: "Paiement foncier",
+  investment_in: "Investissement entrant",
+  investment_out: "Distribution",
+  fee: "Frais",
+  adjustment: "Ajustement",
+};
+
+/** Kinds that the user can create manually (others are derived from loans, land, etc.). */
+export const ManualTransactionKindSchema = z.enum(["fee", "adjustment"]);
+export type ManualTransactionKind = z.infer<typeof ManualTransactionKindSchema>;
 
 export const RepaymentFormSchema = z.object({
   amount: decimalString.refine(
@@ -123,3 +138,21 @@ export const RepaymentFormSchema = z.object({
 });
 export type RepaymentFormInput = z.input<typeof RepaymentFormSchema>;
 export type RepaymentFormValues = z.output<typeof RepaymentFormSchema>;
+
+export const ManualTransactionFormSchema = z.object({
+  kind: ManualTransactionKindSchema,
+  amount: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Le montant doit être positif",
+  ),
+  currency: CurrencyCodeSchema,
+  occurred_at: z.string().date("Date requise"),
+  person_id: z.string().uuid("Personne requise"),
+  notes: emptyToNull,
+});
+export type ManualTransactionFormInput = z.input<
+  typeof ManualTransactionFormSchema
+>;
+export type ManualTransactionFormValues = z.output<
+  typeof ManualTransactionFormSchema
+>;
