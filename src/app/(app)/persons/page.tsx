@@ -31,7 +31,7 @@ export default function PersonsPage() {
             Vos clients, débiteurs, créanciers et partenaires
           </p>
         </div>
-        <Button render={<Link href="/persons/new" />}>
+        <Button nativeButton={false} render={<Link href="/persons/new" />}>
           <Plus />
           Nouvelle
         </Button>

@@ -171,7 +171,7 @@ export function PersonForm({ initial }: PersonFormProps) {
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button
           variant="ghost"
-          type="button"
+          nativeButton={false}
           render={
             <Link href={initial ? `/persons/${initial.id}` : "/persons"} />
           }

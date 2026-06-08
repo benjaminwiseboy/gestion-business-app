@@ -1,45 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
+// Intentionally empty: anonymous sign-in is bootstrapped client-side in
+// <Providers> (src/app/providers.tsx) to avoid blocking page rendering on
+// Edge runtime cold starts and Supabase Auth round-trips during development.
+//
+// When proper email/OTP auth lands in V1, restore a middleware that refreshes
+// the session and gates protected routes.
+
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return response;
-  }
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    await supabase.auth.signInAnonymously();
-  }
-
-  return response;
+export function middleware(_request: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/).*)",
-  ],
+  matcher: [],
 };

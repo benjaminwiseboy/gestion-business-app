@@ -80,6 +80,7 @@ export default function PersonDetailPage({ params }: PageProps) {
             <Button
               variant="outline"
               size="sm"
+              nativeButton={false}
               render={<Link href={`/persons/${person.id}/edit`} />}
             >
               <Pencil />

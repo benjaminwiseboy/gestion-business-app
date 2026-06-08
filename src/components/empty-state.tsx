@@ -42,6 +42,7 @@ export function EmptyState({
           className="mt-4"
           size="sm"
           onClick={action.onClick}
+          nativeButton={action.href ? false : undefined}
           render={action.href ? <a href={action.href} /> : undefined}
         >
           {action.label}
