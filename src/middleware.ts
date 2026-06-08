@@ -5,9 +5,9 @@
 // When proper email/OTP auth lands in V1, restore a middleware that refreshes
 // the session and gates protected routes.
 
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-export function middleware(_request: NextRequest) {
+export function middleware() {
   return NextResponse.next();
 }
 
