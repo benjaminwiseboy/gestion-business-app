@@ -3,9 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ import {
 } from "@/domain/validators";
 import { useCreateLoan, useUpdateLoan } from "@/hooks/use-loans";
 import { usePersons } from "@/hooks/use-persons";
+import { QuickPersonDialog } from "@/components/forms/quick-person-dialog";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -33,11 +35,23 @@ interface LoanFormProps {
   initial?: Loan;
 }
 
+const INTEREST_TYPE_LABELS: Record<string, string> = {
+  none: "Sans intérêts",
+  simple: "Intérêts simples",
+  compound: "Intérêts composés",
+};
+
+const CURRENCY_LABELS: Record<string, string> = {
+  XOF: "FCFA (XOF)",
+  USD: "USD",
+};
+
 export function LoanForm({ initial }: LoanFormProps) {
   const router = useRouter();
   const createMutation = useCreateLoan();
   const updateMutation = useUpdateLoan();
   const personsQuery = usePersons();
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const form = useForm<LoanFormInput, unknown, LoanFormValues>({
     resolver: zodResolver(LoanFormSchema),
@@ -130,43 +144,43 @@ export function LoanForm({ initial }: LoanFormProps) {
         error={errors.person_id?.message}
         htmlFor="person_id"
       >
-        <Select
-          value={personId}
-          onValueChange={(value) => {
-            if (value)
-              form.setValue("person_id", value, { shouldValidate: true });
-          }}
-          disabled={personsQuery.isLoading}
-        >
-          <SelectTrigger id="person_id" className="w-full">
-            <SelectValue
-              placeholder={
-                personsQuery.isLoading
-                  ? "Chargement…"
-                  : "Sélectionner une personne"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {(personsQuery.data ?? []).map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.full_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {!personsQuery.isLoading && (personsQuery.data ?? []).length === 0 ? (
-          <p className="text-xs text-zinc-500">
-            Aucune personne enregistrée.{" "}
-            <Link
-              href="/persons/new"
-              className="text-blue-600 underline-offset-2 hover:underline"
-            >
-              En créer une
-            </Link>{" "}
-            d&apos;abord.
-          </p>
-        ) : null}
+        <div className="flex gap-2">
+          <Select
+            value={personId}
+            onValueChange={(value) => {
+              if (value)
+                form.setValue("person_id", value, { shouldValidate: true });
+            }}
+            disabled={personsQuery.isLoading}
+          >
+            <SelectTrigger id="person_id" className="w-full flex-1">
+              <SelectValue>
+                {personsLabel(
+                  personId,
+                  personsQuery.data,
+                  personsQuery.isLoading,
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(personsQuery.data ?? []).map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setQuickAddOpen(true)}
+            aria-label="Ajouter une nouvelle personne"
+            title="Ajouter une nouvelle personne"
+          >
+            <UserPlus />
+          </Button>
+        </div>
       </Field>
 
       <div className="grid gap-6 sm:grid-cols-2">
@@ -201,7 +215,7 @@ export function LoanForm({ initial }: LoanFormProps) {
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue>{CURRENCY_LABELS[currency] ?? currency}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="XOF">FCFA (XOF)</SelectItem>
@@ -243,12 +257,14 @@ export function LoanForm({ initial }: LoanFormProps) {
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue>
+                {INTEREST_TYPE_LABELS[interestType ?? "none"]}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Sans intérêts</SelectItem>
-              <SelectItem value="simple">Simples</SelectItem>
-              <SelectItem value="compound">Composés</SelectItem>
+              <SelectItem value="simple">Intérêts simples</SelectItem>
+              <SelectItem value="compound">Intérêts composés</SelectItem>
             </SelectContent>
           </Select>
           <div className="sm:col-span-2">
@@ -291,8 +307,31 @@ export function LoanForm({ initial }: LoanFormProps) {
           {isSubmitting ? "Enregistrement…" : initial ? "Enregistrer" : "Créer"}
         </Button>
       </div>
+
+      <QuickPersonDialog
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        onCreated={(p) =>
+          form.setValue("person_id", p.id, { shouldValidate: true })
+        }
+      />
     </form>
   );
+}
+
+function personsLabel(
+  id: string,
+  persons: { id: string; full_name: string }[] | undefined,
+  isLoading: boolean,
+) {
+  if (!id)
+    return (
+      <span className="text-muted-foreground">
+        {isLoading ? "Chargement…" : "Sélectionner une personne"}
+      </span>
+    );
+  const p = persons?.find((p) => p.id === id);
+  return p?.full_name ?? <span className="text-muted-foreground">Inconnu</span>;
 }
 
 function DirectionOption({

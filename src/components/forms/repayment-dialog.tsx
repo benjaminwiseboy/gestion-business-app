@@ -135,7 +135,9 @@ export function RepaymentDialog({
                 }}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {currency === "XOF" ? "FCFA (XOF)" : currency}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="XOF">FCFA (XOF)</SelectItem>
