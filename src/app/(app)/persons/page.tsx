@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Plus, Search, Users } from "lucide-react";
+import { Building2, Plus, Search, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { useFilteredPersons } from "@/hooks/use-persons";
-import { PERSON_ROLE_LABELS, type PersonRole } from "@/domain/validators";
+import { PERSON_KIND_LABELS, type PersonKindInput } from "@/domain/validators";
 import { cn } from "@/lib/utils";
 
 export default function PersonsPage() {
@@ -28,7 +28,7 @@ export default function PersonsPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Personnes</h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Vos clients, débiteurs, créanciers et partenaires
+            Particuliers et organisations avec qui vous traitez
           </p>
         </div>
         <Button nativeButton={false} render={<Link href="/persons/new" />}>
@@ -77,7 +77,7 @@ function PersonsList({
   persons: ReadonlyArray<{
     id: string;
     full_name: string;
-    roles: string[];
+    kind: PersonKindInput;
     phone: string | null;
     email: string | null;
   }>;
@@ -93,24 +93,37 @@ function PersonsList({
               "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
             )}
           >
-            <div className="min-w-0 flex-1">
-              <div className="font-medium">{p.full_name}</div>
-              <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                {[p.phone, p.email].filter(Boolean).join(" · ") ||
-                  "Sans contact"}
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <PersonKindIcon kind={p.kind} />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{p.full_name}</div>
+                <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
+                  {[p.phone, p.email].filter(Boolean).join(" · ") ||
+                    "Sans contact"}
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-end gap-1">
-              {p.roles.map((role) => (
-                <Badge key={role} variant="secondary" className="text-[10px]">
-                  {PERSON_ROLE_LABELS[role as PersonRole] ?? role}
-                </Badge>
-              ))}
-            </div>
+            {p.kind === "entity" ? (
+              <Badge variant="secondary" className="text-[10px]">
+                Morale
+              </Badge>
+            ) : null}
           </Link>
         </li>
       ))}
     </ul>
+  );
+}
+
+function PersonKindIcon({ kind }: { kind: PersonKindInput }) {
+  const Icon = kind === "entity" ? Building2 : User;
+  return (
+    <div
+      aria-label={PERSON_KIND_LABELS[kind]}
+      className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+    >
+      <Icon className="size-3.5" />
+    </div>
   );
 }
 

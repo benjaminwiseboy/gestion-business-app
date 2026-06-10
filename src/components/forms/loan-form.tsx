@@ -35,12 +35,6 @@ interface LoanFormProps {
   initial?: Loan;
 }
 
-const INTEREST_TYPE_LABELS: Record<string, string> = {
-  none: "Sans intérêts",
-  simple: "Intérêts simples",
-  compound: "Intérêts composés",
-};
-
 const CURRENCY_LABELS: Record<string, string> = {
   XOF: "FCFA (XOF)",
   USD: "USD",
@@ -62,9 +56,11 @@ export function LoanForm({ initial }: LoanFormProps) {
       principal_currency: (initial?.principal_currency ?? "XOF") as
         | "XOF"
         | "USD",
+      has_interest: Boolean(initial?.interest_rate),
       interest_rate:
-        initial?.interest_rate != null ? String(initial.interest_rate) : "",
-      interest_type: initial?.interest_type ?? "none",
+        initial?.interest_rate != null
+          ? String(initial.interest_rate * 100)
+          : "",
       issue_date: initial?.issue_date ?? new Date().toISOString().slice(0, 10),
       due_date: initial?.due_date ?? "",
       notes: initial?.notes ?? "",
@@ -72,7 +68,7 @@ export function LoanForm({ initial }: LoanFormProps) {
   });
 
   const direction = form.watch("direction");
-  const interestType = form.watch("interest_type");
+  const hasInterest = form.watch("has_interest");
   const currency = form.watch("principal_currency");
   const personId = form.watch("person_id");
   const errors = form.formState.errors;
@@ -89,13 +85,10 @@ export function LoanForm({ initial }: LoanFormProps) {
         principal_amount: parseFloat(parsed.principal_amount),
         principal_currency: parsed.principal_currency,
         interest_rate:
-          parsed.interest_rate !== null && parsed.interest_type !== "none"
-            ? parseFloat(parsed.interest_rate)
+          parsed.has_interest && parsed.interest_rate !== null
+            ? parseFloat(parsed.interest_rate) / 100
             : null,
-        interest_type:
-          parsed.interest_type === "none"
-            ? null
-            : (parsed.interest_type ?? null),
+        interest_type: parsed.has_interest ? ("simple" as const) : null,
         issue_date: parsed.issue_date,
         due_date: parsed.due_date,
         notes: parsed.notes,
@@ -243,47 +236,46 @@ export function LoanForm({ initial }: LoanFormProps) {
         </Field>
       </div>
 
-      <Field label="Intérêts" description="Optionnel">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Select
-            value={interestType ?? "none"}
-            onValueChange={(value) => {
-              if (value)
-                form.setValue(
-                  "interest_type",
-                  value as "simple" | "compound" | "none",
-                  { shouldValidate: true },
-                );
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue>
-                {INTEREST_TYPE_LABELS[interestType ?? "none"]}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sans intérêts</SelectItem>
-              <SelectItem value="simple">Intérêts simples</SelectItem>
-              <SelectItem value="compound">Intérêts composés</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="sm:col-span-2">
-            <Input
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              placeholder="Taux annuel (ex: 0.12 pour 12%)"
-              disabled={interestType === "none"}
-              className="tabular-nums"
-              {...form.register("interest_rate")}
-            />
+      <Field label="Intérêts">
+        <label className="flex cursor-pointer items-center gap-2.5 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-700 dark:accent-zinc-100"
+            {...form.register("has_interest")}
+          />
+          <div className="flex-1">
+            <div className="text-sm font-medium">Avec intérêts</div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              Cochez si un taux d&apos;intérêt s&apos;applique à ce prêt.
+            </div>
+          </div>
+        </label>
+        {hasInterest ? (
+          <div className="mt-3 flex flex-col gap-1.5">
+            <Label htmlFor="interest_rate">
+              Taux annuel <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <Input
+                id="interest_rate"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="Ex: 12"
+                className="pr-10 tabular-nums"
+                {...form.register("interest_rate")}
+              />
+              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-zinc-500">
+                %
+              </span>
+            </div>
             {errors.interest_rate?.message ? (
-              <p className="mt-1 text-xs text-red-600">
+              <p className="text-xs text-red-600">
                 {errors.interest_rate.message}
               </p>
             ) : null}
           </div>
-        </div>
+        ) : null}
       </Field>
 
       <Field label="Notes" error={errors.notes?.message} htmlFor="notes">

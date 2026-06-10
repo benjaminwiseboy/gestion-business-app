@@ -9,6 +9,7 @@ export type Json =
 export type LoanDirection = "lent" | "borrowed";
 export type LoanStatus = "active" | "repaid" | "overdue" | "partial";
 export type InterestType = "simple" | "compound" | "none";
+export type PersonKind = "individual" | "entity";
 export type TransactionKind =
   | "loan_disbursement"
   | "repayment"
@@ -81,7 +82,7 @@ export interface Database {
           id: string;
           owner_id: string;
           full_name: string;
-          roles: string[];
+          kind: PersonKind;
           phone: string | null;
           email: string | null;
           address: string | null;
@@ -92,7 +93,7 @@ export interface Database {
           id?: string;
           owner_id?: string;
           full_name: string;
-          roles?: string[];
+          kind?: PersonKind;
           phone?: string | null;
           email?: string | null;
           address?: string | null;
@@ -100,7 +101,7 @@ export interface Database {
         };
         Update: {
           full_name?: string;
-          roles?: string[];
+          kind?: PersonKind;
           phone?: string | null;
           email?: string | null;
           address?: string | null;

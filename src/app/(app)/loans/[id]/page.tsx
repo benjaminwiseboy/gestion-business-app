@@ -163,9 +163,11 @@ export default function LoanDetailPage({ params }: PageProps) {
           ) : null}
           {loan.interest_type && loan.interest_type !== "none" ? (
             <DetailField
-              label={`Intérêts ${
-                loan.interest_type === "simple" ? "simples" : "composés"
-              } cumulés`}
+              label={
+                loan.interest_rate
+                  ? `Intérêts cumulés (${(loan.interest_rate * 100).toFixed(2)} %/an)`
+                  : "Intérêts cumulés"
+              }
               value={
                 <MoneyDisplay
                   money={accruedInterest}

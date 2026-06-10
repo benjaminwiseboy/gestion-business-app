@@ -5,21 +5,17 @@ import { z } from "zod";
 export const CurrencyCodeSchema = z.enum(["XOF", "USD"]);
 export type CurrencyCodeInput = z.infer<typeof CurrencyCodeSchema>;
 
-export const PersonRoleSchema = z.enum([
-  "borrower",
-  "lender",
-  "client",
-  "investor",
-  "surveyor",
-]);
-export type PersonRole = z.infer<typeof PersonRoleSchema>;
+export const PersonKindSchema = z.enum(["individual", "entity"]);
+export type PersonKindInput = z.infer<typeof PersonKindSchema>;
 
-export const PERSON_ROLE_LABELS: Record<PersonRole, string> = {
-  borrower: "Emprunteur",
-  lender: "Prêteur",
-  client: "Client",
-  investor: "Investisseur",
-  surveyor: "Géomètre",
+export const PERSON_KIND_LABELS: Record<PersonKindInput, string> = {
+  individual: "Personne physique",
+  entity: "Personne morale",
+};
+
+export const PERSON_KIND_DESCRIPTIONS: Record<PersonKindInput, string> = {
+  individual: "Un particulier (ami, famille, partenaire, etc.)",
+  entity: "Une organisation (banque, tontine, association, société, etc.)",
 };
 
 const emptyToNull = z
@@ -32,7 +28,7 @@ const emptyToNull = z
 
 export const PersonFormSchema = z.object({
   full_name: z.string().trim().min(1, "Le nom est requis").max(120),
-  roles: z.array(PersonRoleSchema).min(1, "Au moins un rôle est requis"),
+  kind: PersonKindSchema,
   phone: emptyToNull,
   email: emptyToNull.refine(
     (v) => v === null || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
@@ -49,9 +45,6 @@ export type PersonFormValues = z.output<typeof PersonFormSchema>;
 export const LoanDirectionSchema = z.enum(["lent", "borrowed"]);
 export type LoanDirectionInput = z.infer<typeof LoanDirectionSchema>;
 
-export const InterestTypeSchema = z.enum(["simple", "compound", "none"]);
-export type InterestTypeInput = z.infer<typeof InterestTypeSchema>;
-
 const decimalString = z
   .string()
   .trim()
@@ -67,6 +60,7 @@ export const LoanFormSchema = z
       "Le montant doit être positif",
     ),
     principal_currency: CurrencyCodeSchema,
+    has_interest: z.boolean(),
     interest_rate: z
       .string()
       .trim()
@@ -76,7 +70,6 @@ export const LoanFormSchema = z
         (v) => v === null || (/^\d+([.]\d+)?$/.test(v) && parseFloat(v) >= 0),
         "Taux invalide",
       ),
-    interest_type: InterestTypeSchema.optional().nullable(),
     issue_date: z.string().date("Date d'octroi requise"),
     due_date: z
       .string()
@@ -95,6 +88,15 @@ export const LoanFormSchema = z
     {
       message: "L'échéance doit être postérieure à la date d'octroi",
       path: ["due_date"],
+    },
+  )
+  .refine(
+    (data) =>
+      !data.has_interest ||
+      (data.interest_rate !== null && parseFloat(data.interest_rate) > 0),
+    {
+      message: "Saisissez un taux positif",
+      path: ["interest_rate"],
     },
   );
 export type LoanFormInput = z.input<typeof LoanFormSchema>;

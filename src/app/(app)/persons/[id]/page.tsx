@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Pencil, Trash2 } from "lucide-react";
+import { Building2, ChevronLeft, Pencil, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/error-state";
 import { useDeletePerson, usePerson } from "@/hooks/use-persons";
-import { PERSON_ROLE_LABELS, type PersonRole } from "@/domain/validators";
+import { PERSON_KIND_LABELS } from "@/domain/validators";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -65,15 +65,18 @@ export default function PersonDetailPage({ params }: PageProps) {
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight">
+            <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+              {person.kind === "entity" ? (
+                <Building2 className="size-5 text-zinc-500" />
+              ) : (
+                <User className="size-5 text-zinc-500" />
+              )}
               {person.full_name}
             </h2>
             <div className="mt-2 flex flex-wrap gap-1">
-              {person.roles.map((role) => (
-                <Badge key={role} variant="secondary" className="text-[10px]">
-                  {PERSON_ROLE_LABELS[role as PersonRole] ?? role}
-                </Badge>
-              ))}
+              <Badge variant="secondary" className="text-[10px]">
+                {PERSON_KIND_LABELS[person.kind]}
+              </Badge>
             </div>
           </div>
           <div className="flex gap-2">

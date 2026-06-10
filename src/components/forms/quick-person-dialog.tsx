@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,9 +18,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  PERSON_ROLE_LABELS,
-  PersonRoleSchema,
-  type PersonRole,
+  PERSON_KIND_LABELS,
+  PersonKindSchema,
+  type PersonKindInput,
 } from "@/domain/validators";
 import { useCreatePerson } from "@/hooks/use-persons";
 import { cn } from "@/lib/utils";
@@ -29,59 +30,43 @@ type Person = Tables<"persons">;
 
 const QuickPersonSchema = z.object({
   full_name: z.string().trim().min(1, "Nom requis").max(120),
-  roles: z.array(PersonRoleSchema).min(1, "Au moins un rôle"),
+  kind: PersonKindSchema,
 });
 type QuickPersonValues = z.infer<typeof QuickPersonSchema>;
-
-const ROLES: PersonRole[] = [
-  "borrower",
-  "lender",
-  "client",
-  "investor",
-  "surveyor",
-];
 
 interface QuickPersonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (person: Person) => void;
-  defaultRole?: PersonRole;
+  defaultKind?: PersonKindInput;
 }
 
 export function QuickPersonDialog({
   open,
   onOpenChange,
   onCreated,
-  defaultRole = "client",
+  defaultKind = "individual",
 }: QuickPersonDialogProps) {
   const mutation = useCreatePerson();
   const form = useForm<QuickPersonValues>({
     resolver: zodResolver(QuickPersonSchema),
-    defaultValues: { full_name: "", roles: [defaultRole] },
+    defaultValues: { full_name: "", kind: defaultKind },
   });
 
   useEffect(() => {
     if (open) {
-      form.reset({ full_name: "", roles: [defaultRole] });
+      form.reset({ full_name: "", kind: defaultKind });
     }
-  }, [open, defaultRole, form]);
+  }, [open, defaultKind, form]);
 
-  const roles = form.watch("roles");
+  const kind = form.watch("kind");
   const errors = form.formState.errors;
-
-  function toggleRole(role: PersonRole) {
-    const current = form.getValues("roles");
-    const next = current.includes(role)
-      ? current.filter((r) => r !== role)
-      : [...current, role];
-    form.setValue("roles", next, { shouldValidate: true });
-  }
 
   async function onSubmit(values: QuickPersonValues) {
     try {
       const created = await mutation.mutateAsync({
         full_name: values.full_name,
-        roles: values.roles,
+        kind: values.kind,
       });
       toast.success("Personne créée");
       onCreated(created);
@@ -107,47 +92,41 @@ export function QuickPersonDialog({
           className="flex flex-col gap-4"
         >
           <div className="flex flex-col gap-1.5">
+            <Label>Type</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <KindChip
+                active={kind === "individual"}
+                kindValue="individual"
+                icon={<User className="size-4" />}
+                onClick={() => form.setValue("kind", "individual")}
+              />
+              <KindChip
+                active={kind === "entity"}
+                kindValue="entity"
+                icon={<Building2 className="size-4" />}
+                onClick={() => form.setValue("kind", "entity")}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="quick_name">
-              Nom complet <span className="text-red-500">*</span>
+              {kind === "entity" ? "Raison sociale" : "Nom complet"}{" "}
+              <span className="text-red-500">*</span>
             </Label>
             <Input
               id="quick_name"
               autoFocus
-              autoComplete="name"
-              placeholder="Ex: Awa Diop"
+              autoComplete={kind === "entity" ? "organization" : "name"}
+              placeholder={
+                kind === "entity"
+                  ? "Ex: Tontine ADJF, Ecobank…"
+                  : "Ex: Awa Diop"
+              }
               {...form.register("full_name")}
             />
             {errors.full_name ? (
               <p className="text-xs text-red-600">{errors.full_name.message}</p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>
-              Rôles <span className="text-red-500">*</span>
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {ROLES.map((role) => {
-                const active = roles.includes(role);
-                return (
-                  <button
-                    key={role}
-                    type="button"
-                    onClick={() => toggleRole(role)}
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                      active
-                        ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                        : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800",
-                    )}
-                  >
-                    {PERSON_ROLE_LABELS[role]}
-                  </button>
-                );
-              })}
-            </div>
-            {errors.roles ? (
-              <p className="text-xs text-red-600">{errors.roles.message}</p>
             ) : null}
           </div>
 
@@ -166,5 +145,33 @@ export function QuickPersonDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function KindChip({
+  active,
+  kindValue,
+  icon,
+  onClick,
+}: {
+  active: boolean;
+  kindValue: PersonKindInput;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+        active
+          ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
+          : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50",
+      )}
+    >
+      {icon}
+      {PERSON_KIND_LABELS[kindValue]}
+    </button>
   );
 }

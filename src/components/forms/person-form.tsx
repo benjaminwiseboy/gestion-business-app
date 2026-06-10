@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  PERSON_ROLE_LABELS,
+  PERSON_KIND_DESCRIPTIONS,
+  PERSON_KIND_LABELS,
   PersonFormSchema,
   type PersonFormInput,
-  type PersonRole,
+  type PersonFormValues,
+  type PersonKindInput,
 } from "@/domain/validators";
 import { useCreatePerson, useUpdatePerson } from "@/hooks/use-persons";
 import { cn } from "@/lib/utils";
@@ -25,24 +28,16 @@ interface PersonFormProps {
   initial?: Person;
 }
 
-const ROLES: PersonRole[] = [
-  "borrower",
-  "lender",
-  "client",
-  "investor",
-  "surveyor",
-];
-
 export function PersonForm({ initial }: PersonFormProps) {
   const router = useRouter();
   const createMutation = useCreatePerson();
   const updateMutation = useUpdatePerson();
 
-  const form = useForm<PersonFormInput>({
+  const form = useForm<PersonFormInput, unknown, PersonFormValues>({
     resolver: zodResolver(PersonFormSchema),
     defaultValues: {
       full_name: initial?.full_name ?? "",
-      roles: (initial?.roles ?? ["client"]) as PersonRole[],
+      kind: initial?.kind ?? "individual",
       phone: initial?.phone ?? "",
       email: initial?.email ?? "",
       address: initial?.address ?? "",
@@ -50,34 +45,21 @@ export function PersonForm({ initial }: PersonFormProps) {
     },
   });
 
-  const roles = form.watch("roles");
+  const kind = form.watch("kind");
   const errors = form.formState.errors;
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
     form.formState.isSubmitting;
 
-  function toggleRole(role: PersonRole) {
-    const current = form.getValues("roles");
-    const next = current.includes(role)
-      ? current.filter((r) => r !== role)
-      : [...current, role];
-    form.setValue("roles", next, { shouldValidate: true });
-  }
-
-  async function onSubmit(values: PersonFormInput) {
+  async function onSubmit(parsed: PersonFormValues) {
     try {
       if (initial) {
-        await updateMutation.mutateAsync({
-          id: initial.id,
-          input: PersonFormSchema.parse(values),
-        });
+        await updateMutation.mutateAsync({ id: initial.id, input: parsed });
         toast.success("Personne mise à jour");
         router.push(`/persons/${initial.id}`);
       } else {
-        const created = await createMutation.mutateAsync(
-          PersonFormSchema.parse(values),
-        );
+        const created = await createMutation.mutateAsync(parsed);
         toast.success("Personne créée");
         router.push(`/persons/${created.id}`);
       }
@@ -91,46 +73,40 @@ export function PersonForm({ initial }: PersonFormProps) {
       onSubmit={form.handleSubmit(onSubmit)}
       className="flex flex-col gap-6"
     >
+      <Field label="Type" required>
+        <div className="grid grid-cols-2 gap-2">
+          <KindOption
+            active={kind === "individual"}
+            kind="individual"
+            icon={<User className="size-4" />}
+            onClick={() => form.setValue("kind", "individual")}
+          />
+          <KindOption
+            active={kind === "entity"}
+            kind="entity"
+            icon={<Building2 className="size-4" />}
+            onClick={() => form.setValue("kind", "entity")}
+          />
+        </div>
+      </Field>
+
       <Field
-        label="Nom complet"
+        label={kind === "entity" ? "Raison sociale" : "Nom complet"}
         required
         error={errors.full_name?.message}
         htmlFor="full_name"
       >
         <Input
           id="full_name"
-          autoComplete="name"
+          autoComplete={kind === "entity" ? "organization" : "name"}
           autoFocus
+          placeholder={
+            kind === "entity"
+              ? "Ex: Tontine ADJF, Ecobank, Association Wakili…"
+              : "Ex: Awa Diop"
+          }
           {...form.register("full_name")}
         />
-      </Field>
-
-      <Field
-        label="Rôles"
-        required
-        error={errors.roles?.message}
-        description="Au moins un rôle est requis. Une personne peut cumuler plusieurs rôles."
-      >
-        <div className="flex flex-wrap gap-2">
-          {ROLES.map((role) => {
-            const active = roles.includes(role);
-            return (
-              <button
-                key={role}
-                type="button"
-                onClick={() => toggleRole(role)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  active
-                    ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800",
-                )}
-              >
-                {PERSON_ROLE_LABELS[role]}
-              </button>
-            );
-          })}
-        </div>
       </Field>
 
       <div className="grid gap-6 sm:grid-cols-2">
@@ -183,6 +159,39 @@ export function PersonForm({ initial }: PersonFormProps) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function KindOption({
+  active,
+  kind,
+  icon,
+  onClick,
+}: {
+  active: boolean;
+  kind: PersonKindInput;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-colors",
+        active
+          ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-800"
+          : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50",
+      )}
+    >
+      <div className="flex items-center gap-1.5 text-sm font-medium">
+        {icon}
+        {PERSON_KIND_LABELS[kind]}
+      </div>
+      <div className="text-xs text-zinc-500 dark:text-zinc-400">
+        {PERSON_KIND_DESCRIPTIONS[kind]}
+      </div>
+    </button>
   );
 }
 
