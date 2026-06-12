@@ -14,11 +14,8 @@ export default function NewTransactionPage() {
           Transactions
         </Link>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-          Nouvelle transaction
+          Nouvelle dépense
         </h2>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Pour les frais et ajustements manuels uniquement.
-        </p>
       </div>
       <ManualTransactionForm />
     </div>

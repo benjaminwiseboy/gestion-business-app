@@ -40,7 +40,7 @@ const KIND_OPTIONS: { value: KindFilter; label: string }[] = [
   { value: "land_payment", label: "Paiements fonciers" },
   { value: "investment_in", label: "Investissements" },
   { value: "investment_out", label: "Distributions" },
-  { value: "fee", label: "Frais" },
+  { value: "fee", label: "Dépenses" },
   { value: "adjustment", label: "Ajustements" },
 ];
 
@@ -84,14 +84,22 @@ export default function TransactionsPage() {
             Transactions
           </h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Journal central de tous les mouvements financiers
+            Journal de tous les mouvements d&apos;argent
           </p>
         </div>
         <Button nativeButton={false} render={<Link href="/transactions/new" />}>
           <Plus />
-          Nouvelle
+          Nouvelle dépense
         </Button>
       </header>
+
+      <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-400">
+        Les <strong>remboursements</strong> apparaissent ici automatiquement
+        quand vous les saisissez depuis la fiche d&apos;un prêt. Le bouton{" "}
+        <strong>Nouvelle dépense</strong> sert uniquement aux sorties
+        d&apos;argent qui ne sont liées à aucun prêt (frais bancaires,
+        transport, achats, etc.).
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <div className="relative min-w-60 flex-1">

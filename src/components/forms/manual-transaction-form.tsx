@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import {
   ManualTransactionFormSchema,
-  TRANSACTION_KIND_LABELS,
   type ManualTransactionFormInput,
   type ManualTransactionFormValues,
 } from "@/domain/validators";
@@ -55,7 +54,6 @@ export function ManualTransactionForm() {
     },
   });
 
-  const kind = form.watch("kind");
   const currency = form.watch("currency");
   const personId = form.watch("person_id");
   const errors = form.formState.errors;
@@ -74,7 +72,7 @@ export function ManualTransactionForm() {
         linked_entity_id: null,
         notes: parsed.notes,
       });
-      toast.success("Transaction enregistrée");
+      toast.success("Dépense enregistrée");
       router.push(`/transactions/${created.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
@@ -86,34 +84,14 @@ export function ManualTransactionForm() {
       onSubmit={form.handleSubmit(onSubmit)}
       className="flex flex-col gap-6"
     >
-      <Field label="Type" required>
-        <Select
-          value={kind}
-          onValueChange={(value) => {
-            if (value)
-              form.setValue("kind", value as "fee" | "adjustment", {
-                shouldValidate: true,
-              });
-          }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue>{TRANSACTION_KIND_LABELS[kind] ?? kind}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fee">{TRANSACTION_KIND_LABELS.fee}</SelectItem>
-            <SelectItem value="adjustment">
-              {TRANSACTION_KIND_LABELS.adjustment}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Les remboursements, décaissements et autres transactions liées sont
-          créés depuis les écrans Prêts, Foncier, etc.
-        </p>
-      </Field>
+      <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-400">
+        Une <strong>dépense</strong> est une sortie d&apos;argent qui n&apos;est
+        pas liée à un prêt : frais bancaires, transport, fournitures, service
+        payé à un prestataire, etc.
+      </div>
 
       <Field
-        label="Personne"
+        label="Bénéficiaire"
         required
         error={errors.person_id?.message}
         htmlFor="person_id"
@@ -222,7 +200,7 @@ export function ManualTransactionForm() {
           Annuler
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Enregistrement…" : "Créer"}
+          {isSubmitting ? "Enregistrement…" : "Enregistrer"}
         </Button>
       </div>
 

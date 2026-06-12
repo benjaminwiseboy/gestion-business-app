@@ -121,12 +121,12 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKindInput, string> = {
   land_payment: "Paiement foncier",
   investment_in: "Investissement entrant",
   investment_out: "Distribution",
-  fee: "Frais",
+  fee: "Dépense",
   adjustment: "Ajustement",
 };
 
 /** Kinds that the user can create manually (others are derived from loans, land, etc.). */
-export const ManualTransactionKindSchema = z.enum(["fee", "adjustment"]);
+export const ManualTransactionKindSchema = z.enum(["fee"]);
 export type ManualTransactionKind = z.infer<typeof ManualTransactionKindSchema>;
 
 export const RepaymentFormSchema = z.object({
