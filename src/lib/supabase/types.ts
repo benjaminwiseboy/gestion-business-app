@@ -10,6 +10,7 @@ export type LoanDirection = "lent" | "borrowed";
 export type LoanStatus = "active" | "repaid" | "overdue" | "partial";
 export type InterestType = "simple" | "compound" | "none";
 export type PersonKind = "individual" | "entity";
+export type LandProjectStatus = "active" | "settled" | "blocked";
 export type TransactionKind =
   | "loan_disbursement"
   | "repayment"
@@ -218,6 +219,46 @@ export interface Database {
         Update: never;
         Relationships: EmptyRelationships;
       };
+      land_projects: {
+        Row: {
+          id: string;
+          owner_id: string;
+          client_person_id: string | null;
+          title: string;
+          location: string | null;
+          surface_m2: number;
+          price_per_m2_amount: number;
+          price_per_m2_currency: string;
+          total_amount: number;
+          status: LandProjectStatus;
+          notes: string | null;
+        } & Timestamps &
+          SoftDelete;
+        Insert: {
+          id?: string;
+          owner_id?: string;
+          client_person_id?: string | null;
+          title: string;
+          location?: string | null;
+          surface_m2: number;
+          price_per_m2_amount: number;
+          price_per_m2_currency: string;
+          status?: LandProjectStatus;
+          notes?: string | null;
+        };
+        Update: {
+          client_person_id?: string | null;
+          title?: string;
+          location?: string | null;
+          surface_m2?: number;
+          price_per_m2_amount?: number;
+          price_per_m2_currency?: string;
+          status?: LandProjectStatus;
+          notes?: string | null;
+          deleted_at?: string | null;
+        };
+        Relationships: EmptyRelationships;
+      };
     };
     Views: {
       loan_remaining: {
@@ -227,6 +268,17 @@ export interface Database {
           currency: string;
           principal_amount: number;
           repaid_amount: number;
+          remaining_amount: number;
+        };
+        Relationships: EmptyRelationships;
+      };
+      land_project_remaining: {
+        Row: {
+          project_id: string;
+          owner_id: string;
+          currency: string;
+          total_amount: number;
+          paid_amount: number;
           remaining_amount: number;
         };
         Relationships: EmptyRelationships;

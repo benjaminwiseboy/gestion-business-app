@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   LayoutDashboard,
+  MapPin,
   Settings,
   Users,
   Wallet,
@@ -28,10 +29,16 @@ export const NAV_ITEMS: NavItem[] = [
     inBottomNav: true,
   },
   {
+    href: "/land",
+    label: "Foncier",
+    icon: MapPin,
+    inBottomNav: true,
+  },
+  {
     href: "/transactions",
     label: "Transactions",
     icon: ArrowLeftRight,
-    inBottomNav: true,
+    inBottomNav: false,
   },
   {
     href: "/persons",

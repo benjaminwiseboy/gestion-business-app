@@ -203,6 +203,77 @@ export function useCreateRepayment() {
   });
 }
 
+/**
+ * Insert a land_payment transaction linked to a project. Recomputes the
+ * project's status to "settled" when remaining_amount hits 0.
+ */
+export function useCreateLandPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      project: {
+        id: string;
+        client_person_id: string | null;
+        total_amount: number;
+        price_per_m2_currency: string;
+      };
+      amount: number;
+      currency: string;
+      occurred_at: string;
+      notes: string | null;
+      exchange_rate_snapshot?: number;
+    }) => {
+      const supabase = client();
+      const insert: Omit<TablesInsert<"transactions">, "owner_id"> = {
+        kind: "land_payment",
+        amount: input.amount,
+        currency: input.currency,
+        exchange_rate_snapshot: input.exchange_rate_snapshot ?? 1,
+        occurred_at: input.occurred_at,
+        person_id: input.project.client_person_id,
+        linked_entity_type: "land_project",
+        linked_entity_id: input.project.id,
+        notes: input.notes,
+      };
+      const { data: inserted, error: insertError } = await supabase
+        .from("transactions")
+        .insert(insert)
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      // Recompute paid total in the project's own currency and flip
+      // status to "settled" if the remaining balance is now <= 0.
+      const { data: allTx } = await supabase
+        .from("transactions")
+        .select("amount,currency")
+        .eq("linked_entity_type", "land_project")
+        .eq("linked_entity_id", input.project.id)
+        .eq("kind", "land_payment")
+        .is("deleted_at", null);
+      const paid = (allTx ?? [])
+        .filter((t) => t.currency === input.project.price_per_m2_currency)
+        .reduce((acc, t) => acc + Number(t.amount), 0);
+      const nextStatus =
+        paid >= Number(input.project.total_amount) ? "settled" : "active";
+      await supabase
+        .from("land_projects")
+        .update({ status: nextStatus })
+        .eq("id", input.project.id);
+
+      return inserted;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: ["land_project_remaining"] });
+      qc.invalidateQueries({ queryKey: ["land_projects"] });
+      qc.invalidateQueries({
+        queryKey: ["land_projects", variables.project.id],
+      });
+    },
+  });
+}
+
 export function useDeleteTransaction() {
   const qc = useQueryClient();
   return useMutation({
@@ -217,6 +288,8 @@ export function useDeleteTransaction() {
       qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
       qc.invalidateQueries({ queryKey: LOAN_REMAINING_KEY });
       qc.invalidateQueries({ queryKey: LOANS_KEY });
+      qc.invalidateQueries({ queryKey: ["land_project_remaining"] });
+      qc.invalidateQueries({ queryKey: ["land_projects"] });
     },
   });
 }

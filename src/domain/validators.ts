@@ -141,6 +141,62 @@ export const RepaymentFormSchema = z.object({
 export type RepaymentFormInput = z.input<typeof RepaymentFormSchema>;
 export type RepaymentFormValues = z.output<typeof RepaymentFormSchema>;
 
+// Land project ---------------------------------------------------------------
+
+export const LandProjectStatusSchema = z.enum(["active", "settled", "blocked"]);
+export type LandProjectStatusInput = z.infer<typeof LandProjectStatusSchema>;
+
+export const LAND_PROJECT_STATUS_LABELS: Record<
+  LandProjectStatusInput,
+  string
+> = {
+  active: "En cours",
+  settled: "Soldé",
+  blocked: "Bloqué",
+};
+
+export const LandProjectFormSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis").max(120),
+  client_person_id: z
+    .string()
+    .optional()
+    .transform((v) => (v && v !== "" ? v : null))
+    .refine(
+      (v) =>
+        v === null ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+          v,
+        ),
+      "Client invalide",
+    ),
+  location: emptyToNull,
+  surface_m2: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Surface invalide",
+  ),
+  price_per_m2_amount: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Prix invalide",
+  ),
+  price_per_m2_currency: CurrencyCodeSchema,
+  status: LandProjectStatusSchema,
+  notes: emptyToNull,
+});
+export type LandProjectFormInput = z.input<typeof LandProjectFormSchema>;
+export type LandProjectFormValues = z.output<typeof LandProjectFormSchema>;
+
+export const LandPaymentFormSchema = z.object({
+  amount: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Le montant doit être positif",
+  ),
+  currency: CurrencyCodeSchema,
+  occurred_at: z.string().date("Date requise"),
+  notes: emptyToNull,
+});
+export type LandPaymentFormInput = z.input<typeof LandPaymentFormSchema>;
+export type LandPaymentFormValues = z.output<typeof LandPaymentFormSchema>;
+
 export const ManualTransactionFormSchema = z.object({
   kind: ManualTransactionKindSchema,
   amount: decimalString.refine(
