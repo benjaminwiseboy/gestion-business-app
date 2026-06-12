@@ -53,7 +53,7 @@ export function LandPaymentDialog({
     resolver: zodResolver(LandPaymentFormSchema),
     defaultValues: {
       amount: "",
-      currency: (project.price_per_m2_currency as "XOF" | "USD") ?? "XOF",
+      currency: (project.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
       occurred_at: new Date().toISOString().slice(0, 10),
       notes: "",
     },
@@ -63,7 +63,7 @@ export function LandPaymentDialog({
     if (open) {
       form.reset({
         amount: "",
-        currency: (project.price_per_m2_currency as "XOF" | "USD") ?? "XOF",
+        currency: (project.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
         occurred_at: new Date().toISOString().slice(0, 10),
         notes: "",
       });
@@ -129,18 +129,18 @@ export function LandPaymentDialog({
                 value={currency}
                 onValueChange={(value) => {
                   if (value)
-                    form.setValue("currency", value as "XOF" | "USD", {
+                    form.setValue("currency", value as "XAF" | "USD", {
                       shouldValidate: true,
                     });
                 }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>
-                    {currency === "XOF" ? "FCFA (XOF)" : currency}
+                    {currency === "XAF" ? "FCFA (XAF)" : currency}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+                  <SelectItem value="XAF">FCFA (XAF)</SelectItem>
                   <SelectItem value="USD">USD</SelectItem>
                 </SelectContent>
               </Select>

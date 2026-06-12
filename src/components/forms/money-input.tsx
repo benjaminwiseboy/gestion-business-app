@@ -22,7 +22,7 @@ interface MoneyInputProps {
   "aria-label"?: string;
 }
 
-const DEFAULT_CURRENCIES: CurrencyCode[] = ["XOF", "USD"];
+const DEFAULT_CURRENCIES: CurrencyCode[] = ["XAF", "USD"];
 
 export function MoneyInput({
   value,
@@ -81,7 +81,7 @@ export function MoneyInput({
         <SelectContent>
           {currencies.map((c) => (
             <SelectItem key={c} value={c}>
-              {c === "XOF" ? "FCFA" : c}
+              {c === "XAF" ? "FCFA" : c}
             </SelectItem>
           ))}
         </SelectContent>

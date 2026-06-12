@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { CurrencyCode } from "@/lib/money";
 
 const LABEL: Record<CurrencyCode, string> = {
-  XOF: "FCFA",
+  XAF: "FCFA",
   USD: "USD",
 };
 

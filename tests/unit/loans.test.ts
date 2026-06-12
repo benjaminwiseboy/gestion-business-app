@@ -19,7 +19,7 @@ function makeLoan(overrides: Partial<Loan> = {}): Loan {
     person_id: "p1",
     direction: "lent",
     principal_amount: 100000,
-    principal_currency: "XOF",
+    principal_currency: "XAF",
     interest_rate: null,
     interest_type: null,
     issue_date: "2026-01-01",
@@ -39,7 +39,7 @@ function makeTx(overrides: Partial<Transaction>): Transaction {
     owner_id: "owner-1",
     kind: "repayment",
     amount: 0,
-    currency: "XOF",
+    currency: "XAF",
     exchange_rate_snapshot: 1,
     occurred_at: "2026-01-15",
     person_id: "p1",
@@ -68,7 +68,7 @@ describe("sumRepayments", () => {
   });
 
   it("ignores transactions in a different currency", () => {
-    const loan = makeLoan({ principal_currency: "XOF" });
+    const loan = makeLoan({ principal_currency: "XAF" });
     const txs = [makeTx({ amount: 100, currency: "USD" })];
     expect(sumRepayments(loan, txs).amount.equals(0)).toBe(true);
   });
@@ -78,7 +78,7 @@ describe("calculateRemaining", () => {
   it("returns principal when no repayments", () => {
     const remaining = calculateRemaining(makeLoan(), []);
     expect(remaining.amount.equals(100000)).toBe(true);
-    expect(remaining.currency).toBe("XOF");
+    expect(remaining.currency).toBe("XAF");
   });
 
   it("returns principal minus repayments", () => {
@@ -147,7 +147,7 @@ describe("deriveStatus", () => {
   const base = {
     id: LOAN_ID,
     principal_amount: 100000,
-    principal_currency: "XOF",
+    principal_currency: "XAF",
     due_date: "2026-12-31",
   };
 

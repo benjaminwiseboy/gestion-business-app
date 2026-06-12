@@ -151,10 +151,10 @@ export default function TransactionDetailPage({ params }: PageProps) {
             }
           />
         ) : null}
-        {tx.exchange_rate_snapshot && currency !== "XOF" ? (
+        {tx.exchange_rate_snapshot && currency !== "XAF" ? (
           <Field
             label="Taux figé"
-            value={`1 ${currency} = ${tx.exchange_rate_snapshot} XOF`}
+            value={`1 ${currency} = ${tx.exchange_rate_snapshot} XAF`}
           />
         ) : null}
         {tx.notes ? (

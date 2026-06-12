@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Shared primitives ----------------------------------------------------------
 
-export const CurrencyCodeSchema = z.enum(["XOF", "USD"]);
+export const CurrencyCodeSchema = z.enum(["XAF", "USD"]);
 export type CurrencyCodeInput = z.infer<typeof CurrencyCodeSchema>;
 
 export const PersonKindSchema = z.enum(["individual", "entity"]);

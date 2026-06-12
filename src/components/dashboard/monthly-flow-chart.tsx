@@ -53,9 +53,9 @@ const MONTH_LABELS = [
   "Déc",
 ];
 
-const xofFormatter = new Intl.NumberFormat("fr-FR", {
+const xafFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
-  currency: "XOF",
+  currency: "XAF",
   maximumFractionDigits: 0,
 });
 
@@ -106,7 +106,7 @@ export function MonthlyFlowChart({
               <Tooltip
                 formatter={(value) =>
                   typeof value === "number"
-                    ? xofFormatter.format(value)
+                    ? xafFormatter.format(value)
                     : String(value)
                 }
                 labelFormatter={(label) => `Mois : ${label}`}
@@ -163,11 +163,11 @@ function buildMonthly(
     if (!bucket) continue;
     const currency = tx.currency as CurrencyCode;
     const rate = currency === "USD" ? usdRate : 1;
-    const xof = new Decimal(tx.amount).mul(rate).toNumber();
+    const xaf = new Decimal(tx.amount).mul(rate).toNumber();
     if (direction === "in") {
-      bucket.in += xof;
+      bucket.in += xaf;
     } else {
-      bucket.out += xof;
+      bucket.out += xaf;
     }
   }
 

@@ -43,7 +43,7 @@ interface LandProjectFormProps {
 }
 
 const CURRENCY_LABELS: Record<string, string> = {
-  XOF: "FCFA (XOF)",
+  XAF: "FCFA (XAF)",
   USD: "USD",
 };
 
@@ -64,8 +64,8 @@ export function LandProjectForm({ initial }: LandProjectFormProps) {
       location: initial?.location ?? "",
       surface_m2: initial ? String(initial.surface_m2) : "",
       price_per_m2_amount: initial ? String(initial.price_per_m2_amount) : "",
-      price_per_m2_currency: (initial?.price_per_m2_currency ?? "XOF") as
-        | "XOF"
+      price_per_m2_currency: (initial?.price_per_m2_currency ?? "XAF") as
+        | "XAF"
         | "USD",
       status: initial?.status ?? "active",
       notes: initial?.notes ?? "",
@@ -229,7 +229,7 @@ export function LandProjectForm({ initial }: LandProjectFormProps) {
             value={currency}
             onValueChange={(value) => {
               if (value)
-                form.setValue("price_per_m2_currency", value as "XOF" | "USD", {
+                form.setValue("price_per_m2_currency", value as "XAF" | "USD", {
                   shouldValidate: true,
                 });
             }}
@@ -238,7 +238,7 @@ export function LandProjectForm({ initial }: LandProjectFormProps) {
               <SelectValue>{CURRENCY_LABELS[currency] ?? currency}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+              <SelectItem value="XAF">FCFA (XAF)</SelectItem>
               <SelectItem value="USD">USD</SelectItem>
             </SelectContent>
           </Select>

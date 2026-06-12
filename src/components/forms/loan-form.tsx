@@ -36,7 +36,7 @@ interface LoanFormProps {
 }
 
 const CURRENCY_LABELS: Record<string, string> = {
-  XOF: "FCFA (XOF)",
+  XAF: "FCFA (XAF)",
   USD: "USD",
 };
 
@@ -53,8 +53,8 @@ export function LoanForm({ initial }: LoanFormProps) {
       person_id: initial?.person_id ?? "",
       direction: initial?.direction ?? "lent",
       principal_amount: initial ? String(initial.principal_amount) : "",
-      principal_currency: (initial?.principal_currency ?? "XOF") as
-        | "XOF"
+      principal_currency: (initial?.principal_currency ?? "XAF") as
+        | "XAF"
         | "USD",
       has_interest: Boolean(initial?.interest_rate),
       interest_rate:
@@ -202,7 +202,7 @@ export function LoanForm({ initial }: LoanFormProps) {
             value={currency}
             onValueChange={(value) => {
               if (value)
-                form.setValue("principal_currency", value as "XOF" | "USD", {
+                form.setValue("principal_currency", value as "XAF" | "USD", {
                   shouldValidate: true,
                 });
             }}
@@ -211,7 +211,7 @@ export function LoanForm({ initial }: LoanFormProps) {
               <SelectValue>{CURRENCY_LABELS[currency] ?? currency}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+              <SelectItem value="XAF">FCFA (XAF)</SelectItem>
               <SelectItem value="USD">USD</SelectItem>
             </SelectContent>
           </Select>

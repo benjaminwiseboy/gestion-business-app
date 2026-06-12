@@ -1,10 +1,10 @@
 import Decimal from "decimal.js";
 import { type CurrencyCode, type Money, money } from "./money";
 
-export const PIVOT_CURRENCY: CurrencyCode = "XOF";
+export const PIVOT_CURRENCY: CurrencyCode = "XAF";
 
 export const DEFAULT_RATES: Record<CurrencyCode, Decimal> = {
-  XOF: new Decimal(1),
+  XAF: new Decimal(1),
   USD: new Decimal(600),
 };
 

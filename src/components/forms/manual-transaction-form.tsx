@@ -28,7 +28,7 @@ import { usePersons } from "@/hooks/use-persons";
 import { QuickPersonDialog } from "@/components/forms/quick-person-dialog";
 
 const CURRENCY_LABELS: Record<string, string> = {
-  XOF: "FCFA (XOF)",
+  XAF: "FCFA (XAF)",
   USD: "USD",
 };
 
@@ -47,7 +47,7 @@ export function ManualTransactionForm() {
     defaultValues: {
       kind: "fee",
       amount: "",
-      currency: "XOF",
+      currency: "XAF",
       occurred_at: new Date().toISOString().slice(0, 10),
       person_id: "",
       notes: "",
@@ -157,7 +157,7 @@ export function ManualTransactionForm() {
             value={currency}
             onValueChange={(value) => {
               if (value)
-                form.setValue("currency", value as "XOF" | "USD", {
+                form.setValue("currency", value as "XAF" | "USD", {
                   shouldValidate: true,
                 });
             }}
@@ -166,7 +166,7 @@ export function ManualTransactionForm() {
               <SelectValue>{CURRENCY_LABELS[currency] ?? currency}</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="XOF">FCFA (XOF)</SelectItem>
+              <SelectItem value="XAF">FCFA (XAF)</SelectItem>
               <SelectItem value="USD">USD</SelectItem>
             </SelectContent>
           </Select>

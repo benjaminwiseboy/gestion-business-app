@@ -36,7 +36,7 @@ const STATUSES: Status[] = [
 ];
 
 export default function DevUiPage() {
-  const [amount, setAmount] = useState<Money | null>(money(125000, "XOF"));
+  const [amount, setAmount] = useState<Money | null>(money(125000, "XAF"));
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
@@ -52,10 +52,10 @@ export default function DevUiPage() {
         description="Affichage de montants avec équivalent FCFA si devise étrangère"
       >
         <div className="flex flex-wrap items-end gap-6">
-          <MoneyDisplay money={money(1_500_000, "XOF")} size="xl" />
+          <MoneyDisplay money={money(1_500_000, "XAF")} size="xl" />
           <MoneyDisplay money={money(2_500, "USD")} size="xl" />
           <MoneyDisplay money={money(750, "USD")} />
-          <MoneyDisplay money={money(0, "XOF")} size="sm" />
+          <MoneyDisplay money={money(0, "XAF")} size="sm" />
         </div>
       </Section>
 
@@ -77,7 +77,7 @@ export default function DevUiPage() {
 
       <Section title="CurrencyBadge">
         <div className="flex gap-2">
-          <CurrencyBadge currency="XOF" />
+          <CurrencyBadge currency="XAF" />
           <CurrencyBadge currency="USD" />
         </div>
       </Section>

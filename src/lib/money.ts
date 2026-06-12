@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-export type CurrencyCode = "XOF" | "USD";
+export type CurrencyCode = "XAF" | "USD";
 
 export interface Money {
   readonly amount: Decimal;
@@ -8,7 +8,7 @@ export interface Money {
 }
 
 const DECIMALS: Record<CurrencyCode, number> = {
-  XOF: 0,
+  XAF: 0,
   USD: 2,
 };
 

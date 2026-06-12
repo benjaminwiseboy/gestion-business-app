@@ -45,35 +45,35 @@ export interface Database {
           code: string;
           symbol: string;
           decimals: number;
-          default_rate_to_xof: number;
+          default_rate_to_xaf: number;
           created_at: string;
         };
         Insert: {
           code: string;
           symbol: string;
           decimals?: number;
-          default_rate_to_xof?: number;
+          default_rate_to_xaf?: number;
         };
         Update: {
           symbol?: string;
           decimals?: number;
-          default_rate_to_xof?: number;
+          default_rate_to_xaf?: number;
         };
         Relationships: EmptyRelationships;
       };
       user_settings: {
         Row: {
           owner_id: string;
-          usd_to_xof_rate: number;
+          usd_to_xaf_rate: number;
           default_currency: string;
         } & Timestamps;
         Insert: {
           owner_id?: string;
-          usd_to_xof_rate?: number;
+          usd_to_xaf_rate?: number;
           default_currency?: string;
         };
         Update: {
-          usd_to_xof_rate?: number;
+          usd_to_xaf_rate?: number;
           default_currency?: string;
         };
         Relationships: EmptyRelationships;

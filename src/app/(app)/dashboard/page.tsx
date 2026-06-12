@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const isError =
     loansQuery.isError || remainingQuery.isError || txQuery.isError;
 
-  const usdRate = settingsQuery.data?.usd_to_xof_rate ?? 600;
+  const usdRate = settingsQuery.data?.usd_to_xaf_rate ?? 600;
   const loans = loansQuery.data ?? [];
   const remaining = remainingQuery.data ?? {};
 
@@ -298,7 +298,7 @@ function SummaryCard({
           </div>
         ) : (
           <MoneyDisplay
-            money={money(valueXof ?? new Decimal(0), "XOF")}
+            money={money(valueXof ?? new Decimal(0), "XAF")}
             size="xl"
             showPivotEquivalent={false}
           />

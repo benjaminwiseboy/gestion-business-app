@@ -22,7 +22,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (settingsQuery.data) {
-      setRateInput(String(settingsQuery.data.usd_to_xof_rate));
+      setRateInput(String(settingsQuery.data.usd_to_xaf_rate));
     }
   }, [settingsQuery.data]);
 
@@ -34,7 +34,7 @@ export default function SettingsPage() {
       return;
     }
     try {
-      await updateMutation.mutateAsync({ usd_to_xof_rate: rate });
+      await updateMutation.mutateAsync({ usd_to_xaf_rate: rate });
       toast.success("Taux mis à jour");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
@@ -97,7 +97,7 @@ export default function SettingsPage() {
                 disabled={
                   updateMutation.isPending ||
                   rateInput.trim() ===
-                    String(settingsQuery.data?.usd_to_xof_rate ?? "")
+                    String(settingsQuery.data?.usd_to_xaf_rate ?? "")
                 }
               >
                 {updateMutation.isPending ? "Enregistrement…" : "Enregistrer"}
@@ -121,7 +121,7 @@ export default function SettingsPage() {
       <section className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h3 className="text-base font-semibold tracking-tight">À propos</h3>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Field label="Devise pivot" value="FCFA (XOF)" />
+          <Field label="Devise pivot" value="FCFA (XAF)" />
           <Field label="Version" value="0.1.0 — MVP" />
         </dl>
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
