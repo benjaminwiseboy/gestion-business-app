@@ -274,6 +274,82 @@ export function useCreateLandPayment() {
   });
 }
 
+/**
+ * Insert an admin_payment transaction linked to an admin file. Flips the
+ * file's status to "done" when paid >= total_cost_amount.
+ */
+export function useCreateAdminPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      file: {
+        id: string;
+        beneficiary_person_id: string | null;
+        surveyor_person_id: string | null;
+        total_cost_amount: number | null;
+        total_cost_currency: string | null;
+      };
+      amount: number;
+      currency: string;
+      occurred_at: string;
+      notes: string | null;
+      exchange_rate_snapshot?: number;
+    }) => {
+      const supabase = client();
+      const insert: Omit<TablesInsert<"transactions">, "owner_id"> = {
+        kind: "admin_payment",
+        amount: input.amount,
+        currency: input.currency,
+        exchange_rate_snapshot: input.exchange_rate_snapshot ?? 1,
+        occurred_at: input.occurred_at,
+        person_id:
+          input.file.surveyor_person_id ?? input.file.beneficiary_person_id,
+        linked_entity_type: "admin_file",
+        linked_entity_id: input.file.id,
+        notes: input.notes,
+      };
+      const { data: inserted, error: insertError } = await supabase
+        .from("transactions")
+        .insert(insert)
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      if (
+        input.file.total_cost_amount !== null &&
+        input.file.total_cost_currency !== null
+      ) {
+        const { data: allTx } = await supabase
+          .from("transactions")
+          .select("amount,currency")
+          .eq("linked_entity_type", "admin_file")
+          .eq("linked_entity_id", input.file.id)
+          .eq("kind", "admin_payment")
+          .is("deleted_at", null);
+        const paid = (allTx ?? [])
+          .filter((t) => t.currency === input.file.total_cost_currency)
+          .reduce((acc, t) => acc + Number(t.amount), 0);
+        if (paid >= Number(input.file.total_cost_amount)) {
+          await supabase
+            .from("admin_files")
+            .update({ status: "done" })
+            .eq("id", input.file.id);
+        }
+      }
+
+      return inserted;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: ["admin_file_remaining"] });
+      qc.invalidateQueries({ queryKey: ["admin_files"] });
+      qc.invalidateQueries({
+        queryKey: ["admin_files", variables.file.id],
+      });
+    },
+  });
+}
+
 export function useDeleteTransaction() {
   const qc = useQueryClient();
   return useMutation({
@@ -290,6 +366,8 @@ export function useDeleteTransaction() {
       qc.invalidateQueries({ queryKey: LOANS_KEY });
       qc.invalidateQueries({ queryKey: ["land_project_remaining"] });
       qc.invalidateQueries({ queryKey: ["land_projects"] });
+      qc.invalidateQueries({ queryKey: ["admin_file_remaining"] });
+      qc.invalidateQueries({ queryKey: ["admin_files"] });
     },
   });
 }

@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  FileText,
   LayoutDashboard,
   MapPin,
   Settings,
@@ -33,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Foncier",
     icon: MapPin,
     inBottomNav: true,
+  },
+  {
+    href: "/admin-files",
+    label: "Dossiers",
+    icon: FileText,
+    inBottomNav: false,
   },
   {
     href: "/transactions",

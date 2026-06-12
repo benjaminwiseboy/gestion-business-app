@@ -108,6 +108,7 @@ export const TransactionKindSchema = z.enum([
   "loan_disbursement",
   "repayment",
   "land_payment",
+  "admin_payment",
   "investment_in",
   "investment_out",
   "fee",
@@ -119,6 +120,7 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKindInput, string> = {
   loan_disbursement: "Décaissement de prêt",
   repayment: "Remboursement",
   land_payment: "Paiement foncier",
+  admin_payment: "Paiement dossier",
   investment_in: "Investissement entrant",
   investment_out: "Distribution",
   fee: "Dépense",
@@ -196,6 +198,89 @@ export const LandPaymentFormSchema = z.object({
 });
 export type LandPaymentFormInput = z.input<typeof LandPaymentFormSchema>;
 export type LandPaymentFormValues = z.output<typeof LandPaymentFormSchema>;
+
+// Admin file -----------------------------------------------------------------
+
+export const AdminFileTypeSchema = z.enum([
+  "technical",
+  "title",
+  "linking",
+  "survey",
+  "legal",
+]);
+export type AdminFileTypeInput = z.infer<typeof AdminFileTypeSchema>;
+
+export const ADMIN_FILE_TYPE_LABELS: Record<AdminFileTypeInput, string> = {
+  technical: "Dossier technique",
+  title: "Titre foncier",
+  linking: "Rattachement administratif",
+  survey: "Bornage / géométrie",
+  legal: "Procédure juridique",
+};
+
+export const AdminFileStatusSchema = z.enum([
+  "processing",
+  "awaiting_docs",
+  "awaiting_payment",
+  "done",
+  "blocked",
+]);
+export type AdminFileStatusInput = z.infer<typeof AdminFileStatusSchema>;
+
+export const ADMIN_FILE_STATUS_LABELS: Record<AdminFileStatusInput, string> = {
+  processing: "En cours",
+  awaiting_docs: "Attente documents",
+  awaiting_payment: "Attente paiement",
+  done: "Finalisé",
+  blocked: "Bloqué",
+};
+
+const optionalUuid = z
+  .string()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : null))
+  .refine(
+    (v) =>
+      v === null ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v),
+    "Identifiant invalide",
+  );
+
+const optionalDecimal = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v !== "" ? v.replace(",", ".") : null))
+  .refine(
+    (v) => v === null || (/^\d+([.]\d+)?$/.test(v) && parseFloat(v) > 0),
+    "Valeur invalide",
+  );
+
+export const AdminFileFormSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis").max(120),
+  type: AdminFileTypeSchema,
+  beneficiary_person_id: optionalUuid,
+  surveyor_person_id: optionalUuid,
+  surface_m2: optionalDecimal,
+  total_cost_amount: optionalDecimal,
+  total_cost_currency: CurrencyCodeSchema,
+  status: AdminFileStatusSchema,
+  notes: emptyToNull,
+});
+export type AdminFileFormInput = z.input<typeof AdminFileFormSchema>;
+export type AdminFileFormValues = z.output<typeof AdminFileFormSchema>;
+
+export const AdminPaymentFormSchema = z.object({
+  amount: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Le montant doit être positif",
+  ),
+  currency: CurrencyCodeSchema,
+  occurred_at: z.string().date("Date requise"),
+  notes: emptyToNull,
+});
+export type AdminPaymentFormInput = z.input<typeof AdminPaymentFormSchema>;
+export type AdminPaymentFormValues = z.output<typeof AdminPaymentFormSchema>;
 
 export const ManualTransactionFormSchema = z.object({
   kind: ManualTransactionKindSchema,

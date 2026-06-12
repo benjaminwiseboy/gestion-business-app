@@ -11,10 +11,23 @@ export type LoanStatus = "active" | "repaid" | "overdue" | "partial";
 export type InterestType = "simple" | "compound" | "none";
 export type PersonKind = "individual" | "entity";
 export type LandProjectStatus = "active" | "settled" | "blocked";
+export type AdminFileType =
+  | "technical"
+  | "title"
+  | "linking"
+  | "survey"
+  | "legal";
+export type AdminFileStatus =
+  | "processing"
+  | "awaiting_docs"
+  | "awaiting_payment"
+  | "done"
+  | "blocked";
 export type TransactionKind =
   | "loan_disbursement"
   | "repayment"
   | "land_payment"
+  | "admin_payment"
   | "investment_in"
   | "investment_out"
   | "fee"
@@ -219,6 +232,48 @@ export interface Database {
         Update: never;
         Relationships: EmptyRelationships;
       };
+      admin_files: {
+        Row: {
+          id: string;
+          owner_id: string;
+          title: string;
+          type: AdminFileType;
+          beneficiary_person_id: string | null;
+          surveyor_person_id: string | null;
+          surface_m2: number | null;
+          total_cost_amount: number | null;
+          total_cost_currency: string | null;
+          status: AdminFileStatus;
+          notes: string | null;
+        } & Timestamps &
+          SoftDelete;
+        Insert: {
+          id?: string;
+          owner_id?: string;
+          title: string;
+          type: AdminFileType;
+          beneficiary_person_id?: string | null;
+          surveyor_person_id?: string | null;
+          surface_m2?: number | null;
+          total_cost_amount?: number | null;
+          total_cost_currency?: string | null;
+          status?: AdminFileStatus;
+          notes?: string | null;
+        };
+        Update: {
+          title?: string;
+          type?: AdminFileType;
+          beneficiary_person_id?: string | null;
+          surveyor_person_id?: string | null;
+          surface_m2?: number | null;
+          total_cost_amount?: number | null;
+          total_cost_currency?: string | null;
+          status?: AdminFileStatus;
+          notes?: string | null;
+          deleted_at?: string | null;
+        };
+        Relationships: EmptyRelationships;
+      };
       land_projects: {
         Row: {
           id: string;
@@ -277,6 +332,17 @@ export interface Database {
           project_id: string;
           owner_id: string;
           currency: string;
+          total_amount: number;
+          paid_amount: number;
+          remaining_amount: number;
+        };
+        Relationships: EmptyRelationships;
+      };
+      admin_file_remaining: {
+        Row: {
+          file_id: string;
+          owner_id: string;
+          currency: string | null;
           total_amount: number;
           paid_amount: number;
           remaining_amount: number;
