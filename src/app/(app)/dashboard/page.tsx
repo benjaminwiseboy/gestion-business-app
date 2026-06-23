@@ -3,17 +3,15 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import {
-  AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
-  CalendarClock,
   ChevronRight,
   Percent,
+  PiggyBank,
   RefreshCw,
   Scale,
+  TrendingUp,
 } from "lucide-react";
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
 import Decimal from "decimal.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -21,16 +19,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/error-state";
 import { MoneyDisplay } from "@/components/money-display";
-import { StatusBadge } from "@/components/status-badge";
 import { MonthlyFlowChart } from "@/components/dashboard/monthly-flow-chart";
 import {
   useLoans,
   useLoanRemaining,
   type LoanWithPerson,
 } from "@/hooks/use-loans";
+import {
+  useInvestmentBalance,
+  useInvestments,
+  type InvestmentWithCounterparty,
+} from "@/hooks/use-investments";
+import { useAdminFiles } from "@/hooks/use-admin-files";
+import {
+  useLandProjects,
+  useLandRemaining,
+} from "@/hooks/use-land-projects";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useUserSettings } from "@/hooks/use-user-settings";
 import { money, type CurrencyCode } from "@/lib/money";
+import {
+  computeAlerts,
+  DOMAIN_CONFIG,
+  SEVERITY_CONFIG,
+  type Alert,
+  type AlertSeverity,
+} from "@/lib/alerts";
 import type { Views } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -40,28 +54,65 @@ export default function DashboardPage() {
   const remainingQuery = useLoanRemaining();
   const txQuery = useTransactions();
   const settingsQuery = useUserSettings();
+  const investmentsQuery = useInvestments();
+  const investmentBalanceQuery = useInvestmentBalance();
+  const adminFilesQuery = useAdminFiles();
+  const landProjectsQuery = useLandProjects();
+  const landRemainingQuery = useLandRemaining();
 
   const isLoading =
     loansQuery.isLoading || remainingQuery.isLoading || settingsQuery.isLoading;
   const isError =
-    loansQuery.isError || remainingQuery.isError || txQuery.isError;
+    loansQuery.isError ||
+    remainingQuery.isError ||
+    txQuery.isError ||
+    investmentsQuery.isError ||
+    investmentBalanceQuery.isError ||
+    adminFilesQuery.isError ||
+    landProjectsQuery.isError ||
+    landRemainingQuery.isError;
 
   const usdRate = settingsQuery.data?.usd_to_xaf_rate ?? 600;
   const loans = loansQuery.data ?? [];
   const remaining = remainingQuery.data ?? {};
+  const investments = investmentsQuery.data ?? [];
+  const investmentBalance = investmentBalanceQuery.data ?? {};
+  const adminFiles = adminFilesQuery.data ?? [];
+  const landProjects = landProjectsQuery.data ?? [];
+  const landRemaining = landRemainingQuery.data ?? {};
+  const transactions = txQuery.data ?? [];
 
   const stats = useMemo(
     () => computeStats(loans, remaining, usdRate),
     [loans, remaining, usdRate],
   );
-  const upcoming = useMemo(
-    () => upcomingLoans(loans, remaining, 7),
-    [loans, remaining],
+  const investmentStats = useMemo(
+    () => computeInvestmentStats(investments, investmentBalance, usdRate),
+    [investments, investmentBalance, usdRate],
   );
-  const overdue = useMemo(
-    () => overdueLoans(loans, remaining),
-    [loans, remaining],
+  const alerts = useMemo(
+    () =>
+      computeAlerts({
+        loans,
+        loanRemaining: remaining,
+        investments,
+        adminFiles,
+        landProjects,
+        landRemaining,
+        transactions,
+      }),
+    [
+      loans,
+      remaining,
+      investments,
+      adminFiles,
+      landProjects,
+      landRemaining,
+      transactions,
+    ],
   );
+
+  const alertsBySeverity = useMemo(() => groupBySeverity(alerts), [alerts]);
 
   function onRefresh() {
     qc.invalidateQueries();
@@ -125,43 +176,49 @@ export default function DashboardPage() {
             />
           </div>
 
-          {(upcoming.length > 0 || overdue.length > 0) && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {overdue.length > 0 ? (
-                <SectionCard
-                  title="Retards"
-                  icon={<AlertTriangle className="size-4 text-red-600" />}
-                  count={overdue.length}
-                  tone="danger"
-                >
-                  <LoanItems
-                    items={overdue}
-                    remaining={remaining}
-                    mode="overdue"
-                  />
-                </SectionCard>
-              ) : null}
-              {upcoming.length > 0 ? (
-                <SectionCard
-                  title="Échéances dans 7 jours"
-                  icon={<CalendarClock className="size-4 text-amber-600" />}
-                  count={upcoming.length}
-                  tone="warning"
-                >
-                  <LoanItems
-                    items={upcoming}
-                    remaining={remaining}
-                    mode="upcoming"
-                  />
-                </SectionCard>
-              ) : null}
+          {investments.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <SummaryCard
+                label="Capital investi (actif)"
+                icon={<PiggyBank className="size-4 text-indigo-600" />}
+                valueXof={investmentStats.outstandingXof}
+                description={`${investmentStats.activeCount} actif(s)`}
+              />
+              <SummaryCard
+                label="Profit cumulé"
+                icon={<TrendingUp className="size-4 text-emerald-600" />}
+                valueXof={investmentStats.realizedProfitXof}
+                description="Net retours − apports"
+                emphasis={investmentStats.realizedProfitXof.gt(0)}
+              />
+              <SummaryCard
+                label="Total investissements"
+                icon={<Scale className="size-4 text-blue-600" />}
+                valueXof={investmentStats.contributedXof}
+                description={`Sur ${investmentStats.totalCount} investissement(s)`}
+              />
             </div>
-          )}
+          ) : null}
 
-          <MonthlyFlowChart
-            transactions={txQuery.data ?? []}
-            usdRate={usdRate}
-          />
+          {alerts.length > 0 ? (
+            <div className="grid gap-4 lg:grid-cols-3">
+              {(["overdue", "upcoming", "attention"] as AlertSeverity[]).map(
+                (severity) => {
+                  const items = alertsBySeverity[severity];
+                  if (!items || items.length === 0) return null;
+                  return (
+                    <AlertsSection
+                      key={severity}
+                      severity={severity}
+                      alerts={items}
+                    />
+                  );
+                },
+              )}
+            </div>
+          ) : null}
+
+          <MonthlyFlowChart transactions={transactions} usdRate={usdRate} />
         </>
       )}
     </div>
@@ -226,41 +283,59 @@ function computeStats(
   };
 }
 
-function upcomingLoans(
-  loans: LoanWithPerson[],
-  remaining: Record<string, Views<"loan_remaining">>,
-  withinDays: number,
-): LoanWithPerson[] {
-  const today = new Date();
-  const horizon = new Date(today.getTime() + withinDays * 24 * 3600 * 1000);
-  return loans
-    .filter((l) => {
-      if (l.status === "repaid") return false;
-      if (!l.due_date) return false;
-      const due = parseISO(l.due_date);
-      if (due < today) return false;
-      if (due > horizon) return false;
-      const row = remaining[l.id];
-      return !row || row.remaining_amount > 0;
-    })
-    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
+interface InvestmentStats {
+  outstandingXof: Decimal;
+  contributedXof: Decimal;
+  realizedProfitXof: Decimal;
+  activeCount: number;
+  totalCount: number;
 }
 
-function overdueLoans(
-  loans: LoanWithPerson[],
-  remaining: Record<string, Views<"loan_remaining">>,
-): LoanWithPerson[] {
-  const today = new Date();
-  return loans
-    .filter((l) => {
-      if (l.status === "repaid") return false;
-      if (!l.due_date) return false;
-      const due = parseISO(l.due_date);
-      if (due >= today) return false;
-      const row = remaining[l.id];
-      return !row || row.remaining_amount > 0;
-    })
-    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1));
+function computeInvestmentStats(
+  investments: InvestmentWithCounterparty[],
+  balance: Record<string, Views<"investment_balance">>,
+  usdRate: number,
+): InvestmentStats {
+  let outstanding = new Decimal(0);
+  let contributed = new Decimal(0);
+  let profit = new Decimal(0);
+  let activeCount = 0;
+
+  for (const inv of investments) {
+    const currency = inv.principal_currency as CurrencyCode;
+    const rate = currency === "USD" ? usdRate : 1;
+    const row = balance[inv.id];
+    if (!row) continue;
+    const contributedXof = new Decimal(row.contributed_amount).mul(rate);
+    const returnedXof = new Decimal(row.returned_amount).mul(rate);
+    const netXof = returnedXof.minus(contributedXof);
+    contributed = contributed.plus(contributedXof);
+    profit = profit.plus(netXof);
+    if (inv.status === "active") {
+      activeCount += 1;
+      outstanding = outstanding.plus(
+        Decimal.max(contributedXof.minus(returnedXof), 0),
+      );
+    }
+  }
+
+  return {
+    outstandingXof: outstanding,
+    contributedXof: contributed,
+    realizedProfitXof: profit,
+    activeCount,
+    totalCount: investments.length,
+  };
+}
+
+function groupBySeverity(alerts: Alert[]): Record<AlertSeverity, Alert[]> {
+  const out: Record<AlertSeverity, Alert[]> = {
+    overdue: [],
+    upcoming: [],
+    attention: [],
+  };
+  for (const alert of alerts) out[alert.severity].push(alert);
+  return out;
 }
 
 function SummaryCard({
@@ -313,105 +388,95 @@ function SummaryCard({
   );
 }
 
-function SectionCard({
-  title,
-  icon,
-  count,
-  tone,
-  children,
+function AlertsSection({
+  severity,
+  alerts,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  count: number;
-  tone: "warning" | "danger";
-  children: React.ReactNode;
+  severity: AlertSeverity;
+  alerts: Alert[];
 }) {
+  const config = SEVERITY_CONFIG[severity];
+  const Icon = config.icon;
+  const tone = config.tone;
   return (
     <div
       className={cn(
         "flex flex-col gap-3 rounded-lg border p-4",
-        tone === "danger"
-          ? "border-red-200 bg-red-50/40 dark:border-red-950 dark:bg-red-950/30"
-          : "border-amber-200 bg-amber-50/40 dark:border-amber-950 dark:bg-amber-950/30",
+        tone === "danger" &&
+          "border-red-200 bg-red-50/40 dark:border-red-950 dark:bg-red-950/30",
+        tone === "warning" &&
+          "border-amber-200 bg-amber-50/40 dark:border-amber-950 dark:bg-amber-950/30",
+        tone === "info" &&
+          "border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/40",
       )}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold">
-          {icon}
-          {title}
+          <Icon
+            className={cn(
+              "size-4",
+              tone === "danger" && "text-red-600",
+              tone === "warning" && "text-amber-600",
+              tone === "info" && "text-zinc-500",
+            )}
+          />
+          {config.label}
         </div>
         <Badge
           variant="ghost"
           className={cn(
             "text-[10px]",
-            tone === "danger"
-              ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-              : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+            tone === "danger" &&
+              "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+            tone === "warning" &&
+              "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+            tone === "info" &&
+              "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200",
           )}
         >
-          {count}
+          {alerts.length}
         </Badge>
       </div>
-      {children}
+      <ul className="divide-y divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+        {alerts.map((alert) => (
+          <AlertItem key={alert.id} alert={alert} />
+        ))}
+      </ul>
     </div>
   );
 }
 
-function LoanItems({
-  items,
-  remaining,
-  mode,
-}: {
-  items: LoanWithPerson[];
-  remaining: Record<string, Views<"loan_remaining">>;
-  mode: "upcoming" | "overdue";
-}) {
-  const today = new Date();
+function AlertItem({ alert }: { alert: Alert }) {
+  const domain = DOMAIN_CONFIG[alert.domain];
+  const Icon = domain.icon;
   return (
-    <ul className="divide-y divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-      {items.map((loan) => {
-        const row = remaining[loan.id];
-        const due = parseISO(loan.due_date!);
-        const days = differenceInCalendarDays(due, today);
-        const relative =
-          mode === "overdue"
-            ? `${Math.abs(days)} j de retard`
-            : days === 0
-              ? "Aujourd'hui"
-              : `dans ${days} j`;
-        return (
-          <li key={loan.id}>
-            <Link
-              href={`/loans/${loan.id}`}
-              className="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  {loan.person?.full_name ?? "—"}
-                  <StatusBadge status={loan.status} />
-                </div>
-                <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                  {format(due, "d MMM yyyy", { locale: fr })} · {relative}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {row ? (
-                  <MoneyDisplay
-                    money={money(
-                      row.remaining_amount,
-                      row.currency as CurrencyCode,
-                    )}
-                    size="sm"
-                    showPivotEquivalent={false}
-                  />
-                ) : null}
-                <ChevronRight className="size-4 text-zinc-400" />
-              </div>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+    <li>
+      <Link
+        href={alert.href}
+        className="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      >
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <Icon
+            className="mt-0.5 size-4 shrink-0 text-zinc-500"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-medium">
+                {alert.title}
+              </span>
+              <Badge variant="outline" className="text-[10px] font-normal">
+                {domain.label}
+              </Badge>
+            </div>
+            <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {alert.description}
+            </div>
+          </div>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-zinc-400" />
+      </Link>
+    </li>
   );
 }
 
