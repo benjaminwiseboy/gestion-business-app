@@ -350,6 +350,58 @@ export function useCreateAdminPayment() {
   });
 }
 
+/**
+ * Insert an investment movement transaction.
+ * - direction='in'  → kind='investment_in'  (apport: argent injecté dans l'invest)
+ * - direction='out' → kind='investment_out' (retour: argent récupéré)
+ */
+export function useCreateInvestmentMovement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      investment: {
+        id: string;
+        counterparty_person_id: string | null;
+        principal_currency: string;
+      };
+      direction: "in" | "out";
+      amount: number;
+      currency: string;
+      occurred_at: string;
+      notes: string | null;
+      exchange_rate_snapshot?: number;
+    }) => {
+      const supabase = client();
+      const insert: Omit<TablesInsert<"transactions">, "owner_id"> = {
+        kind: input.direction === "in" ? "investment_in" : "investment_out",
+        amount: input.amount,
+        currency: input.currency,
+        exchange_rate_snapshot: input.exchange_rate_snapshot ?? 1,
+        occurred_at: input.occurred_at,
+        person_id: input.investment.counterparty_person_id,
+        linked_entity_type: "investment",
+        linked_entity_id: input.investment.id,
+        notes: input.notes,
+      };
+      const { data: inserted, error } = await supabase
+        .from("transactions")
+        .insert(insert)
+        .select()
+        .single();
+      if (error) throw error;
+      return inserted;
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
+      qc.invalidateQueries({ queryKey: ["investment_balance"] });
+      qc.invalidateQueries({ queryKey: ["investments"] });
+      qc.invalidateQueries({
+        queryKey: ["investments", variables.investment.id],
+      });
+    },
+  });
+}
+
 export function useDeleteTransaction() {
   const qc = useQueryClient();
   return useMutation({
@@ -368,6 +420,8 @@ export function useDeleteTransaction() {
       qc.invalidateQueries({ queryKey: ["land_projects"] });
       qc.invalidateQueries({ queryKey: ["admin_file_remaining"] });
       qc.invalidateQueries({ queryKey: ["admin_files"] });
+      qc.invalidateQueries({ queryKey: ["investment_balance"] });
+      qc.invalidateQueries({ queryKey: ["investments"] });
     },
   });
 }

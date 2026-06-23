@@ -299,3 +299,121 @@ export type ManualTransactionFormInput = z.input<
 export type ManualTransactionFormValues = z.output<
   typeof ManualTransactionFormSchema
 >;
+
+// Investment ----------------------------------------------------------------
+
+export const InvestmentTypeSchema = z.enum([
+  "capital",
+  "tontine",
+  "savings",
+  "other",
+]);
+export type InvestmentTypeInput = z.infer<typeof InvestmentTypeSchema>;
+
+export const INVESTMENT_TYPE_LABELS: Record<InvestmentTypeInput, string> = {
+  capital: "Capital / Participation",
+  tontine: "Tontine",
+  savings: "Épargne / DAT",
+  other: "Autre",
+};
+
+export const INVESTMENT_TYPE_DESCRIPTIONS: Record<InvestmentTypeInput, string> =
+  {
+    capital: "Mise dans un commerce ou projet contre une part du profit",
+    tontine: "Cotisation périodique dans un groupe rotatif",
+    savings: "Épargne, dépôt à terme, compte rémunéré",
+    other: "Autre type d'investissement (foncier spéculatif, crypto, etc.)",
+  };
+
+export const InvestmentStatusSchema = z.enum(["active", "closed", "lost"]);
+export type InvestmentStatusInput = z.infer<typeof InvestmentStatusSchema>;
+
+export const INVESTMENT_STATUS_LABELS: Record<InvestmentStatusInput, string> = {
+  active: "Actif",
+  closed: "Clôturé",
+  lost: "Perdu",
+};
+
+export const InvestmentFormSchema = z
+  .object({
+    title: z.string().trim().min(1, "Titre requis").max(120),
+    type: InvestmentTypeSchema,
+    counterparty_person_id: z
+      .string()
+      .optional()
+      .transform((v) => (v && v !== "" ? v : null))
+      .refine(
+        (v) =>
+          v === null ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+            v,
+          ),
+        "Contrepartie invalide",
+      ),
+    principal_amount: decimalString.refine(
+      (v) => parseFloat(v) > 0,
+      "Le montant doit être positif",
+    ),
+    principal_currency: CurrencyCodeSchema,
+    expected_return_pct: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => (v && v !== "" ? v.replace(",", ".") : null))
+      .refine(
+        (v) => v === null || (/^\d+([.]\d+)?$/.test(v) && parseFloat(v) >= 0),
+        "Rendement invalide",
+      ),
+    start_date: z.string().date("Date de début requise"),
+    end_date: z
+      .string()
+      .optional()
+      .transform((v) => (v && v !== "" ? v : null))
+      .refine(
+        (v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v),
+        "Date de fin invalide",
+      ),
+    status: InvestmentStatusSchema,
+    notes: emptyToNull,
+  })
+  .refine(
+    (data) =>
+      data.end_date === null ||
+      new Date(data.end_date) >= new Date(data.start_date),
+    {
+      message: "La date de fin doit être postérieure à la date de début",
+      path: ["end_date"],
+    },
+  );
+export type InvestmentFormInput = z.input<typeof InvestmentFormSchema>;
+export type InvestmentFormValues = z.output<typeof InvestmentFormSchema>;
+
+export const InvestmentMovementDirectionSchema = z.enum(["in", "out"]);
+export type InvestmentMovementDirectionInput = z.infer<
+  typeof InvestmentMovementDirectionSchema
+>;
+
+export const INVESTMENT_MOVEMENT_DIRECTION_LABELS: Record<
+  InvestmentMovementDirectionInput,
+  string
+> = {
+  in: "Apport",
+  out: "Retour",
+};
+
+export const InvestmentMovementFormSchema = z.object({
+  direction: InvestmentMovementDirectionSchema,
+  amount: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Le montant doit être positif",
+  ),
+  currency: CurrencyCodeSchema,
+  occurred_at: z.string().date("Date requise"),
+  notes: emptyToNull,
+});
+export type InvestmentMovementFormInput = z.input<
+  typeof InvestmentMovementFormSchema
+>;
+export type InvestmentMovementFormValues = z.output<
+  typeof InvestmentMovementFormSchema
+>;

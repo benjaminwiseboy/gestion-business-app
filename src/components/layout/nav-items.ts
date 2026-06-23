@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   MapPin,
   Settings,
+  TrendingUp,
   Users,
   Wallet,
   type LucideIcon,
@@ -33,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/land",
     label: "Foncier",
     icon: MapPin,
+    inBottomNav: true,
+  },
+  {
+    href: "/investments",
+    label: "Investissements",
+    icon: TrendingUp,
     inBottomNav: true,
   },
   {

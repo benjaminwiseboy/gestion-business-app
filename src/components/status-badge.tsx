@@ -11,7 +11,9 @@ export type Status =
   | "processing"
   | "awaiting_docs"
   | "awaiting_payment"
-  | "done";
+  | "done"
+  | "closed"
+  | "lost";
 
 const CONFIG: Record<Status, { label: string; className: string }> = {
   active: {
@@ -58,6 +60,14 @@ const CONFIG: Record<Status, { label: string; className: string }> = {
   done: {
     label: "Terminé",
     className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  },
+  closed: {
+    label: "Clôturé",
+    className: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  },
+  lost: {
+    label: "Perdu",
+    className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
   },
 };
 

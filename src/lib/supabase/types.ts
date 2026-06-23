@@ -23,6 +23,8 @@ export type AdminFileStatus =
   | "awaiting_payment"
   | "done"
   | "blocked";
+export type InvestmentType = "capital" | "tontine" | "savings" | "other";
+export type InvestmentStatus = "active" | "closed" | "lost";
 export type TransactionKind =
   | "loan_disbursement"
   | "repayment"
@@ -274,6 +276,51 @@ export interface Database {
         };
         Relationships: EmptyRelationships;
       };
+      investments: {
+        Row: {
+          id: string;
+          owner_id: string;
+          counterparty_person_id: string | null;
+          title: string;
+          type: InvestmentType;
+          principal_amount: number;
+          principal_currency: string;
+          expected_return_pct: number | null;
+          start_date: string;
+          end_date: string | null;
+          status: InvestmentStatus;
+          notes: string | null;
+        } & Timestamps &
+          SoftDelete;
+        Insert: {
+          id?: string;
+          owner_id?: string;
+          counterparty_person_id?: string | null;
+          title: string;
+          type?: InvestmentType;
+          principal_amount: number;
+          principal_currency: string;
+          expected_return_pct?: number | null;
+          start_date: string;
+          end_date?: string | null;
+          status?: InvestmentStatus;
+          notes?: string | null;
+        };
+        Update: {
+          counterparty_person_id?: string | null;
+          title?: string;
+          type?: InvestmentType;
+          principal_amount?: number;
+          principal_currency?: string;
+          expected_return_pct?: number | null;
+          start_date?: string;
+          end_date?: string | null;
+          status?: InvestmentStatus;
+          notes?: string | null;
+          deleted_at?: string | null;
+        };
+        Relationships: EmptyRelationships;
+      };
       land_projects: {
         Row: {
           id: string;
@@ -346,6 +393,17 @@ export interface Database {
           total_amount: number;
           paid_amount: number;
           remaining_amount: number;
+        };
+        Relationships: EmptyRelationships;
+      };
+      investment_balance: {
+        Row: {
+          investment_id: string;
+          owner_id: string;
+          currency: string;
+          contributed_amount: number;
+          returned_amount: number;
+          net_amount: number;
         };
         Relationships: EmptyRelationships;
       };
