@@ -276,6 +276,37 @@ export interface Database {
         };
         Relationships: EmptyRelationships;
       };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          owner_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          last_notified_at: string | null;
+        } & Timestamps &
+          SoftDelete;
+        Insert: {
+          id?: string;
+          owner_id?: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          last_notified_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Update: {
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          last_notified_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Relationships: EmptyRelationships;
+      };
       investments: {
         Row: {
           id: string;

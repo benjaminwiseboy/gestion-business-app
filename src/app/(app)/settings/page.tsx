@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Bell, BellOff, Settings as SettingsIcon, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   useUpdateUserSettings,
   useUserSettings,
 } from "@/hooks/use-user-settings";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { money } from "@/lib/money";
 
 export default function SettingsPage() {
@@ -118,6 +119,8 @@ export default function SettingsPage() {
         )}
       </section>
 
+      <NotificationsSection />
+
       <section className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
         <h3 className="text-base font-semibold tracking-tight">À propos</h3>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
@@ -131,6 +134,104 @@ export default function SettingsPage() {
         </p>
       </section>
     </div>
+  );
+}
+
+function NotificationsSection() {
+  const push = usePushNotifications();
+
+  async function handleSubscribe() {
+    try {
+      await push.subscribe();
+      toast.success("Notifications activées");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur");
+    }
+  }
+
+  async function handleUnsubscribe() {
+    try {
+      await push.unsubscribe();
+      toast.success("Notifications désactivées");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur");
+    }
+  }
+
+  async function handleTest() {
+    try {
+      await push.sendTest();
+      toast.success(
+        "Test envoyé — la notification devrait arriver dans quelques secondes",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur");
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div>
+        <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+          <Bell className="size-4" />
+          Notifications push
+        </h3>
+        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          Reçois un résumé quotidien des retards et échéances à 8h00. Activable
+          par appareil.
+        </p>
+      </div>
+
+      {push.isLoading ? (
+        <Skeleton className="h-10 w-40" />
+      ) : push.support === "ios-needs-install" ? (
+        <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-950 dark:bg-amber-950/30">
+          <Smartphone className="mt-0.5 size-4 shrink-0 text-amber-700" />
+          <div>
+            <div className="font-medium text-amber-900 dark:text-amber-200">
+              Installation requise sur iPhone
+            </div>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">
+              Ouvre Safari → bouton Partager → «{" "}
+              <strong>Sur l&apos;écran d&apos;accueil</strong> ». Ouvre ensuite
+              l&apos;app depuis son icône et reviens ici.
+            </p>
+          </div>
+        </div>
+      ) : push.support === "unsupported" ? (
+        <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+          Cet appareil/navigateur ne supporte pas les notifications push.
+        </div>
+      ) : push.support === "no-vapid" ? (
+        <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          Configuration serveur incomplète (clé VAPID manquante).
+        </div>
+      ) : push.permission === "denied" ? (
+        <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
+          Les notifications sont bloquées dans le navigateur. Autorise-les
+          depuis les réglages du site puis rafraîchis.
+        </div>
+      ) : push.isSubscribed ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={handleUnsubscribe}
+            disabled={push.isMutating}
+          >
+            <BellOff />
+            {push.isMutating ? "…" : "Désactiver"}
+          </Button>
+          <Button onClick={handleTest} disabled={push.isMutating}>
+            Envoyer un test
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={handleSubscribe} disabled={push.isMutating}>
+          <Bell />
+          {push.isMutating ? "Activation…" : "Activer les notifications"}
+        </Button>
+      )}
+    </section>
   );
 }
 
