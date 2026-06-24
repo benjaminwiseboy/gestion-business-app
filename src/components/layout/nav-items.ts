@@ -58,7 +58,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/persons",
     label: "Personnes",
     icon: Users,
-    inBottomNav: true,
+    inBottomNav: false,
   },
   {
     href: "/settings",
