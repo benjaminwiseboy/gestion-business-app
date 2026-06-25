@@ -11,6 +11,8 @@ export type LoanStatus = "active" | "repaid" | "overdue" | "partial";
 export type InterestType = "simple" | "compound" | "none";
 export type PersonKind = "individual" | "entity";
 export type LandProjectStatus = "active" | "settled" | "blocked";
+export type LandSaleStatus = "active" | "settled" | "blocked";
+export type LandAcquisitionStatus = "owned" | "planned";
 export type AdminFileType =
   | "technical"
   | "title"
@@ -36,7 +38,7 @@ export type TransactionKind =
   | "adjustment";
 export type LinkedEntityType =
   | "loan"
-  | "land_project"
+  | "land_sale"
   | "admin_file"
   | "investment";
 export type ChangeLogAction = "insert" | "update" | "delete";
@@ -238,6 +240,7 @@ export interface Database {
         Row: {
           id: string;
           owner_id: string;
+          land_id: string | null;
           title: string;
           type: AdminFileType;
           beneficiary_person_id: string | null;
@@ -252,6 +255,7 @@ export interface Database {
         Insert: {
           id?: string;
           owner_id?: string;
+          land_id?: string | null;
           title: string;
           type: AdminFileType;
           beneficiary_person_id?: string | null;
@@ -263,6 +267,7 @@ export interface Database {
           notes?: string | null;
         };
         Update: {
+          land_id?: string | null;
           title?: string;
           type?: AdminFileType;
           beneficiary_person_id?: string | null;
@@ -356,13 +361,14 @@ export interface Database {
         Row: {
           id: string;
           owner_id: string;
-          client_person_id: string | null;
           title: string;
           location: string | null;
-          surface_m2: number;
-          price_per_m2_amount: number;
-          price_per_m2_currency: string;
-          total_amount: number;
+          total_surface_m2: number;
+          acquisition_status: LandAcquisitionStatus;
+          acquisition_amount: number | null;
+          acquisition_currency: string | null;
+          acquisition_date: string | null;
+          acquisition_seller_person_id: string | null;
           status: LandProjectStatus;
           notes: string | null;
         } & Timestamps &
@@ -370,23 +376,67 @@ export interface Database {
         Insert: {
           id?: string;
           owner_id?: string;
-          client_person_id?: string | null;
           title: string;
           location?: string | null;
-          surface_m2: number;
-          price_per_m2_amount: number;
-          price_per_m2_currency: string;
+          total_surface_m2: number;
+          acquisition_status?: LandAcquisitionStatus;
+          acquisition_amount?: number | null;
+          acquisition_currency?: string | null;
+          acquisition_date?: string | null;
+          acquisition_seller_person_id?: string | null;
           status?: LandProjectStatus;
           notes?: string | null;
         };
         Update: {
-          client_person_id?: string | null;
           title?: string;
           location?: string | null;
+          total_surface_m2?: number;
+          acquisition_status?: LandAcquisitionStatus;
+          acquisition_amount?: number | null;
+          acquisition_currency?: string | null;
+          acquisition_date?: string | null;
+          acquisition_seller_person_id?: string | null;
+          status?: LandProjectStatus;
+          notes?: string | null;
+          deleted_at?: string | null;
+        };
+        Relationships: EmptyRelationships;
+      };
+      land_sales: {
+        Row: {
+          id: string;
+          owner_id: string;
+          land_id: string;
+          buyer_person_id: string | null;
+          surface_m2: number;
+          price_per_m2_amount: number;
+          price_per_m2_currency: string;
+          total_amount: number;
+          sale_date: string;
+          status: LandSaleStatus;
+          notes: string | null;
+        } & Timestamps &
+          SoftDelete;
+        Insert: {
+          id?: string;
+          owner_id?: string;
+          land_id: string;
+          buyer_person_id?: string | null;
+          surface_m2: number;
+          price_per_m2_amount: number;
+          price_per_m2_currency: string;
+          sale_date?: string;
+          status?: LandSaleStatus;
+          notes?: string | null;
+        };
+        Update: {
+          land_id?: string;
+          buyer_person_id?: string | null;
           surface_m2?: number;
           price_per_m2_amount?: number;
           price_per_m2_currency?: string;
-          status?: LandProjectStatus;
+          sale_date?: string;
+          status?: LandSaleStatus;
           notes?: string | null;
           deleted_at?: string | null;
         };
@@ -405,14 +455,25 @@ export interface Database {
         };
         Relationships: EmptyRelationships;
       };
-      land_project_remaining: {
+      land_sale_remaining: {
         Row: {
-          project_id: string;
+          sale_id: string;
           owner_id: string;
+          land_id: string;
           currency: string;
           total_amount: number;
           paid_amount: number;
           remaining_amount: number;
+        };
+        Relationships: EmptyRelationships;
+      };
+      land_inventory: {
+        Row: {
+          land_id: string;
+          owner_id: string;
+          total_surface_m2: number;
+          sold_surface_m2: number;
+          remaining_surface_m2: number;
         };
         Relationships: EmptyRelationships;
       };

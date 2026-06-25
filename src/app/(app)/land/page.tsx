@@ -16,15 +16,16 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
-import { MoneyDisplay } from "@/components/money-display";
 import { StatusBadge } from "@/components/status-badge";
 import {
-  useLandProjects,
-  useLandRemaining,
-  type LandProjectWithClient,
-} from "@/hooks/use-land-projects";
-import type { LandProjectStatusInput } from "@/domain/validators";
-import { money, type CurrencyCode } from "@/lib/money";
+  useLandInventory,
+  useLands,
+  type LandWithSeller,
+} from "@/hooks/use-lands";
+import {
+  LAND_ACQUISITION_STATUS_LABELS,
+  type LandProjectStatusInput,
+} from "@/domain/validators";
 import type { Views } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,7 @@ type StatusFilter = "all" | LandProjectStatusInput;
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Tous statuts" },
-  { value: "active", label: "En cours" },
+  { value: "active", label: "Actifs" },
   { value: "settled", label: "Soldés" },
   { value: "blocked", label: "Bloqués" },
 ];
@@ -40,23 +41,23 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
 export default function LandPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const projectsQuery = useLandProjects();
-  const remainingQuery = useLandRemaining();
+  const landsQuery = useLands();
+  const inventoryQuery = useLandInventory();
 
   const filtered = useMemo(() => {
-    const all = projectsQuery.data ?? [];
+    const all = landsQuery.data ?? [];
     const q = search.trim().toLowerCase();
-    return all.filter((p) => {
-      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+    return all.filter((l) => {
+      if (statusFilter !== "all" && l.status !== statusFilter) return false;
       if (q) {
-        const inTitle = p.title.toLowerCase().includes(q);
-        const inLocation = p.location?.toLowerCase().includes(q) ?? false;
-        const inClient = p.client?.full_name.toLowerCase().includes(q) ?? false;
-        if (!inTitle && !inLocation && !inClient) return false;
+        const inTitle = l.title.toLowerCase().includes(q);
+        const inLocation = l.location?.toLowerCase().includes(q) ?? false;
+        const inSeller = l.seller?.full_name.toLowerCase().includes(q) ?? false;
+        if (!inTitle && !inLocation && !inSeller) return false;
       }
       return true;
     });
-  }, [projectsQuery.data, search, statusFilter]);
+  }, [landsQuery.data, search, statusFilter]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,12 +65,12 @@ export default function LandPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Foncier</h2>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Projets fonciers (ventes de terrains)
+            Terrains, acquisitions, ventes et dossiers techniques liés
           </p>
         </div>
         <Button nativeButton={false} render={<Link href="/land/new" />}>
           <Plus />
-          Nouveau projet
+          Nouveau terrain
         </Button>
       </header>
 
@@ -77,7 +78,7 @@ export default function LandPage() {
         <div className="relative min-w-60 flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-zinc-400" />
           <Input
-            placeholder="Rechercher par titre, localisation, client"
+            placeholder="Rechercher par titre, localisation, vendeur"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
@@ -104,9 +105,9 @@ export default function LandPage() {
         </Select>
       </div>
 
-      {projectsQuery.isError ? (
-        <ErrorState onRetry={() => projectsQuery.refetch()} />
-      ) : projectsQuery.isLoading ? (
+      {landsQuery.isError ? (
+        <ErrorState onRetry={() => landsQuery.refetch()} />
+      ) : landsQuery.isLoading ? (
         <ListSkeleton />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -114,102 +115,93 @@ export default function LandPage() {
           title={
             search || statusFilter !== "all"
               ? "Aucun résultat"
-              : "Aucun projet enregistré"
+              : "Aucun terrain enregistré"
           }
           description={
             search || statusFilter !== "all"
               ? "Ajustez vos filtres."
-              : "Commencez par créer votre premier projet foncier."
+              : "Commencez par enregistrer votre premier terrain."
           }
           action={
             search || statusFilter !== "all"
               ? undefined
-              : { label: "Nouveau projet", href: "/land/new" }
+              : { label: "Nouveau terrain", href: "/land/new" }
           }
         />
       ) : (
-        <ProjectList
-          projects={filtered}
-          remaining={remainingQuery.data ?? {}}
-        />
+        <LandsList lands={filtered} inventory={inventoryQuery.data ?? {}} />
       )}
     </div>
   );
 }
 
-function ProjectList({
-  projects,
-  remaining,
+function LandsList({
+  lands,
+  inventory,
 }: {
-  projects: LandProjectWithClient[];
-  remaining: Record<string, Views<"land_project_remaining">>;
+  lands: LandWithSeller[];
+  inventory: Record<string, Views<"land_inventory">>;
 }) {
   return (
     <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-      {projects.map((p) => {
-        const row = remaining[p.id];
-        const currency = p.price_per_m2_currency as CurrencyCode;
+      {lands.map((l) => {
+        const inv = inventory[l.id];
+        const total = Number(l.total_surface_m2);
+        const sold = inv ? Number(inv.sold_surface_m2) : 0;
+        const remaining = inv ? Number(inv.remaining_surface_m2) : total;
+        const soldPct = total > 0 ? (sold / total) * 100 : 0;
         return (
-          <li key={p.id}>
+          <li key={l.id}>
             <Link
-              href={`/land/${p.id}`}
+              href={`/land/${l.id}`}
               className={cn(
                 "flex flex-wrap items-start justify-between gap-3 px-4 py-3 transition-colors",
                 "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
               )}
             >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{p.title}</span>
-                  <LandStatusBadge status={p.status} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{l.title}</span>
+                  <StatusBadge
+                    status={
+                      l.status === "settled"
+                        ? "settled"
+                        : l.status === "blocked"
+                          ? "blocked"
+                          : "active"
+                    }
+                  />
+                  <Badge variant="outline" className="text-[10px] font-normal">
+                    {LAND_ACQUISITION_STATUS_LABELS[l.acquisition_status]}
+                  </Badge>
                 </div>
                 <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
-                  {[p.client?.full_name, p.location]
-                    .filter(Boolean)
-                    .join(" · ") || "Sans client / localisation"}
+                  {l.location ?? "—"}
                 </div>
                 <div className="mt-0.5 text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
-                  {p.surface_m2.toLocaleString("fr-FR")} m² ×{" "}
-                  {p.price_per_m2_amount.toLocaleString("fr-FR")} {currency}/m²
+                  {total.toLocaleString("fr-FR")} m² · vendu{" "}
+                  {sold.toLocaleString("fr-FR")} m² ({soldPct.toFixed(0)}%)
                 </div>
               </div>
-              <div className="flex flex-col items-end text-right">
-                <MoneyDisplay
-                  money={money(p.total_amount, currency)}
-                  size="lg"
-                  showPivotEquivalent={false}
-                />
-                {row && row.remaining_amount > 0 ? (
-                  <Badge variant="secondary" className="mt-1 text-[10px]">
-                    Reste{" "}
-                    <MoneyDisplay
-                      money={money(row.remaining_amount, currency)}
-                      size="sm"
-                      showPivotEquivalent={false}
-                      className="ml-1"
-                    />
+              <div className="text-right">
+                {remaining > 0 ? (
+                  <Badge variant="secondary" className="text-[10px]">
+                    Reste {remaining.toLocaleString("fr-FR")} m²
                   </Badge>
-                ) : null}
+                ) : (
+                  <Badge
+                    variant="ghost"
+                    className="bg-emerald-100 text-[10px] text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                  >
+                    Tout vendu
+                  </Badge>
+                )}
               </div>
             </Link>
           </li>
         );
       })}
     </ul>
-  );
-}
-
-function LandStatusBadge({ status }: { status: LandProjectStatusInput }) {
-  return (
-    <StatusBadge
-      status={
-        status === "settled"
-          ? "settled"
-          : status === "blocked"
-            ? "blocked"
-            : "active"
-      }
-    />
   );
 }
 

@@ -5,16 +5,16 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
-import { LandProjectForm } from "@/components/forms/land-project-form";
-import { useLandProject } from "@/hooks/use-land-projects";
+import { LandForm } from "@/components/forms/land-form";
+import { useLand } from "@/hooks/use-lands";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function EditLandProjectPage({ params }: PageProps) {
+export default function EditLandPage({ params }: PageProps) {
   const { id } = use(params);
-  const { data: project, isLoading, isError, refetch } = useLandProject(id);
+  const { data: land, isLoading, isError, refetch } = useLand(id);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
@@ -33,13 +33,13 @@ export default function EditLandProjectPage({ params }: PageProps) {
         <ErrorState onRetry={() => refetch()} />
       ) : isLoading ? (
         <Skeleton className="h-96 w-full" />
-      ) : !project ? (
+      ) : !land ? (
         <ErrorState
           title="Introuvable"
-          description="Ce projet n'existe pas ou a été supprimé."
+          description="Ce terrain n'existe pas ou a été supprimé."
         />
       ) : (
-        <LandProjectForm initial={project} />
+        <LandForm initial={land} />
       )}
     </div>
   );

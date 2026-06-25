@@ -143,7 +143,7 @@ export const RepaymentFormSchema = z.object({
 export type RepaymentFormInput = z.input<typeof RepaymentFormSchema>;
 export type RepaymentFormValues = z.output<typeof RepaymentFormSchema>;
 
-// Land project ---------------------------------------------------------------
+// Land (Terrain) -------------------------------------------------------------
 
 export const LandProjectStatusSchema = z.enum(["active", "settled", "blocked"]);
 export type LandProjectStatusInput = z.infer<typeof LandProjectStatusSchema>;
@@ -152,26 +152,85 @@ export const LAND_PROJECT_STATUS_LABELS: Record<
   LandProjectStatusInput,
   string
 > = {
+  active: "Actif",
+  settled: "Soldé",
+  blocked: "Bloqué",
+};
+
+export const LandAcquisitionStatusSchema = z.enum(["owned", "planned"]);
+export type LandAcquisitionStatusInput = z.infer<
+  typeof LandAcquisitionStatusSchema
+>;
+
+export const LAND_ACQUISITION_STATUS_LABELS: Record<
+  LandAcquisitionStatusInput,
+  string
+> = {
+  owned: "Possédé",
+  planned: "À acquérir",
+};
+
+const optionalUuidStr = z
+  .string()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : null))
+  .refine(
+    (v) =>
+      v === null ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v),
+    "Identifiant invalide",
+  );
+
+const optionalDateStr = z
+  .string()
+  .optional()
+  .transform((v) => (v && v !== "" ? v : null))
+  .refine(
+    (v) => v === null || /^\d{4}-\d{2}-\d{2}$/.test(v),
+    "Date invalide",
+  );
+
+const optionalDecimalStr = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v !== "" ? v.replace(",", ".") : null))
+  .refine(
+    (v) => v === null || (/^\d+([.]\d+)?$/.test(v) && parseFloat(v) > 0),
+    "Valeur invalide",
+  );
+
+export const LandFormSchema = z.object({
+  title: z.string().trim().min(1, "Titre requis").max(120),
+  location: emptyToNull,
+  total_surface_m2: decimalString.refine(
+    (v) => parseFloat(v) > 0,
+    "Surface invalide",
+  ),
+  acquisition_status: LandAcquisitionStatusSchema,
+  acquisition_amount: optionalDecimalStr,
+  acquisition_currency: CurrencyCodeSchema,
+  acquisition_date: optionalDateStr,
+  acquisition_seller_person_id: optionalUuidStr,
+  status: LandProjectStatusSchema,
+  notes: emptyToNull,
+});
+export type LandFormInput = z.input<typeof LandFormSchema>;
+export type LandFormValues = z.output<typeof LandFormSchema>;
+
+// Land sale -----------------------------------------------------------------
+
+export const LandSaleStatusSchema = z.enum(["active", "settled", "blocked"]);
+export type LandSaleStatusInput = z.infer<typeof LandSaleStatusSchema>;
+
+export const LAND_SALE_STATUS_LABELS: Record<LandSaleStatusInput, string> = {
   active: "En cours",
   settled: "Soldé",
   blocked: "Bloqué",
 };
 
-export const LandProjectFormSchema = z.object({
-  title: z.string().trim().min(1, "Titre requis").max(120),
-  client_person_id: z
-    .string()
-    .optional()
-    .transform((v) => (v && v !== "" ? v : null))
-    .refine(
-      (v) =>
-        v === null ||
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
-          v,
-        ),
-      "Client invalide",
-    ),
-  location: emptyToNull,
+export const LandSaleFormSchema = z.object({
+  buyer_person_id: optionalUuidStr,
   surface_m2: decimalString.refine(
     (v) => parseFloat(v) > 0,
     "Surface invalide",
@@ -181,11 +240,12 @@ export const LandProjectFormSchema = z.object({
     "Prix invalide",
   ),
   price_per_m2_currency: CurrencyCodeSchema,
-  status: LandProjectStatusSchema,
+  sale_date: z.string().date("Date de vente requise"),
+  status: LandSaleStatusSchema,
   notes: emptyToNull,
 });
-export type LandProjectFormInput = z.input<typeof LandProjectFormSchema>;
-export type LandProjectFormValues = z.output<typeof LandProjectFormSchema>;
+export type LandSaleFormInput = z.input<typeof LandSaleFormSchema>;
+export type LandSaleFormValues = z.output<typeof LandSaleFormSchema>;
 
 export const LandPaymentFormSchema = z.object({
   amount: decimalString.refine(
@@ -259,6 +319,7 @@ const optionalDecimal = z
 export const AdminFileFormSchema = z.object({
   title: z.string().trim().min(1, "Titre requis").max(120),
   type: AdminFileTypeSchema,
+  land_id: optionalUuid,
   beneficiary_person_id: optionalUuid,
   surveyor_person_id: optionalUuid,
   surface_m2: optionalDecimal,

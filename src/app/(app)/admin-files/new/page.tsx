@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ChevronLeft } from "lucide-react";
 import { AdminFileForm } from "@/components/forms/admin-file-form";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function NewAdminFilePage() {
   return (
@@ -17,7 +19,9 @@ export default function NewAdminFilePage() {
           Nouveau dossier
         </h2>
       </div>
-      <AdminFileForm />
+      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+        <AdminFileForm />
+      </Suspense>
     </div>
   );
 }

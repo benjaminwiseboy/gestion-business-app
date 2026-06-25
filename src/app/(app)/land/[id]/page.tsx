@@ -5,8 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronLeft, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  FileText,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
+import Decimal from "decimal.js";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,16 +30,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
 import { MoneyDisplay } from "@/components/money-display";
 import { StatusBadge } from "@/components/status-badge";
-import { LandPaymentDialog } from "@/components/forms/land-payment-dialog";
+import { LandSaleDialog } from "@/components/forms/land-sale-dialog";
+import { LandSalePaymentDialog } from "@/components/forms/land-sale-payment-dialog";
 import {
-  useDeleteLandProject,
-  useLandProject,
-  useLandRemainingFor,
-} from "@/hooks/use-land-projects";
+  useDeleteLand,
+  useLand,
+  useLandInventoryFor,
+} from "@/hooks/use-lands";
 import {
-  useDeleteTransaction,
-  useTransactionsFor,
-} from "@/hooks/use-transactions";
+  useDeleteLandSale,
+  useLandSales,
+  useLandSaleRemaining,
+  type LandSaleWithBuyer,
+} from "@/hooks/use-land-sales";
+import { useAdminFilesForLand } from "@/hooks/use-admin-files";
+import {
+  ADMIN_FILE_TYPE_LABELS,
+  LAND_ACQUISITION_STATUS_LABELS,
+} from "@/domain/validators";
 import { money, type CurrencyCode } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -37,52 +55,74 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function LandProjectDetailPage({ params }: PageProps) {
+export default function LandDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { data: project, isLoading, isError, refetch } = useLandProject(id);
-  const { data: remaining } = useLandRemainingFor(id);
-  const txQuery = useTransactionsFor("land_project", id);
-  const deleteProjectMutation = useDeleteLandProject();
-  const deleteTxMutation = useDeleteTransaction();
-  const [payOpen, setPayOpen] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { data: land, isLoading, isError, refetch } = useLand(id);
+  const { data: inventory } = useLandInventoryFor(id);
+  const salesQuery = useLandSales(id);
+  const saleRemainingQuery = useLandSaleRemaining();
+  const dossiersQuery = useAdminFilesForLand(id);
+
+  const deleteLandMutation = useDeleteLand();
+  const deleteSaleMutation = useDeleteLandSale();
+
+  const [newSaleOpen, setNewSaleOpen] = useState(false);
+  const [editSale, setEditSale] = useState<LandSaleWithBuyer | null>(null);
+  const [payingSale, setPayingSale] = useState<LandSaleWithBuyer | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmDeleteSale, setConfirmDeleteSale] =
+    useState<LandSaleWithBuyer | null>(null);
 
   if (isLoading) return <DetailSkeleton />;
   if (isError) return <ErrorState onRetry={() => refetch()} />;
-  if (!project) {
+  if (!land) {
     return (
       <ErrorState
         title="Introuvable"
-        description="Ce projet n'existe pas ou a été supprimé."
+        description="Ce terrain n'existe pas ou a été supprimé."
       />
     );
   }
 
-  const currency = project.price_per_m2_currency as CurrencyCode;
-  const total = money(project.total_amount, currency);
-  const remainingMoney = remaining
-    ? money(remaining.remaining_amount, currency)
-    : total;
-  const paidMoney = remaining
-    ? money(remaining.paid_amount, currency)
-    : money(0, currency);
+  const totalSurface = Number(land.total_surface_m2);
+  const soldSurface = inventory ? Number(inventory.sold_surface_m2) : 0;
+  const remainingSurface = inventory
+    ? Number(inventory.remaining_surface_m2)
+    : totalSurface;
+  const soldPercent = totalSurface > 0 ? (soldSurface / totalSurface) * 100 : 0;
 
-  async function onDeleteProject() {
-    if (!project) return;
+  const sales = salesQuery.data ?? [];
+  const dossiers = dossiersQuery.data ?? [];
+
+  // Total encaissé par devise (somme des paiements)
+  const totalCollected = computeTotalCollected(sales, saleRemainingQuery.data);
+
+  async function onDeleteLand() {
+    if (!land) return;
+    if (sales.length > 0) {
+      toast.error("Supprime d'abord les ventes liées à ce terrain.");
+      setConfirmDeleteOpen(false);
+      return;
+    }
     try {
-      await deleteProjectMutation.mutateAsync(project.id);
-      toast.success("Projet supprimé");
+      await deleteLandMutation.mutateAsync(land.id);
+      toast.success("Terrain supprimé");
       router.push("/land");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
     }
   }
 
-  async function onDeletePayment(txId: string) {
+  async function onDeleteSale() {
+    if (!confirmDeleteSale) return;
     try {
-      await deleteTxMutation.mutateAsync(txId);
-      toast.success("Paiement supprimé");
+      await deleteSaleMutation.mutateAsync({
+        id: confirmDeleteSale.id,
+        land_id: confirmDeleteSale.land_id,
+      });
+      toast.success("Vente supprimée");
+      setConfirmDeleteSale(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
     }
@@ -102,32 +142,23 @@ export default function LandProjectDetailPage({ params }: PageProps) {
           <div>
             <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
               <MapPin className="size-5 text-zinc-500" />
-              {project.title}
+              {land.title}
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge
                 status={
-                  project.status === "settled"
+                  land.status === "settled"
                     ? "settled"
-                    : project.status === "blocked"
+                    : land.status === "blocked"
                       ? "blocked"
                       : "active"
                 }
               />
-              {project.client ? (
-                <Link
-                  href={`/persons/${project.client.id}`}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Client : {project.client.full_name}
-                </Link>
-              ) : (
-                <span className="text-xs text-zinc-500">Sans client</span>
-              )}
-              {project.location ? (
-                <span className="text-xs text-zinc-500">
-                  · {project.location}
-                </span>
+              <Badge variant="outline" className="text-[10px] font-normal">
+                {LAND_ACQUISITION_STATUS_LABELS[land.acquisition_status]}
+              </Badge>
+              {land.location ? (
+                <span className="text-xs text-zinc-500">{land.location}</span>
               ) : null}
             </div>
           </div>
@@ -136,7 +167,7 @@ export default function LandProjectDetailPage({ params }: PageProps) {
               variant="outline"
               size="sm"
               nativeButton={false}
-              render={<Link href={`/land/${project.id}/edit`} />}
+              render={<Link href={`/land/${land.id}/edit`} />}
             >
               <Pencil />
               Modifier
@@ -144,7 +175,7 @@ export default function LandProjectDetailPage({ params }: PageProps) {
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => setConfirmOpen(true)}
+              onClick={() => setConfirmDeleteOpen(true)}
             >
               <Trash2 />
               Supprimer
@@ -154,121 +185,363 @@ export default function LandProjectDetailPage({ params }: PageProps) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <SummaryCard label="Montant total" value={total} />
-        <SummaryCard label="Encaissé" value={paidMoney} />
-        <SummaryCard label="Reste à payer" value={remainingMoney} emphasis />
+        <SummaryCard
+          label="Surface totale"
+          value={`${totalSurface.toLocaleString("fr-FR")} m²`}
+        />
+        <SummaryCard
+          label="Vendue"
+          value={`${soldSurface.toLocaleString("fr-FR")} m²`}
+          sub={`${soldPercent.toFixed(0)}% du terrain`}
+        />
+        <SummaryCard
+          label="Restante"
+          value={`${remainingSurface.toLocaleString("fr-FR")} m²`}
+          emphasis={remainingSurface > 0}
+        />
       </div>
 
-      <dl className="grid gap-4 rounded-lg border border-zinc-200 bg-white p-4 sm:grid-cols-3 dark:border-zinc-800 dark:bg-zinc-900">
-        <DetailField
-          label="Surface"
-          value={`${project.surface_m2.toLocaleString("fr-FR")} m²`}
-        />
-        <DetailField
-          label="Prix au m²"
-          value={
-            <MoneyDisplay
-              money={money(project.price_per_m2_amount, currency)}
-              size="base"
-              showPivotEquivalent={false}
-            />
-          }
-        />
-        <DetailField
-          label="Créé le"
-          value={format(parseISO(project.created_at), "d MMM yyyy", {
-            locale: fr,
-          })}
-        />
-        {project.notes ? (
-          <DetailField
-            label="Notes"
-            value={project.notes}
-            className="sm:col-span-3"
-          />
-        ) : null}
-      </dl>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold tracking-tight">Paiements</h3>
-          <Button size="sm" onClick={() => setPayOpen(true)}>
-            <Plus />
-            Saisir un paiement
-          </Button>
-        </div>
-
-        {txQuery.isLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : txQuery.data.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 px-6 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
-            Aucun paiement enregistré.
-          </div>
-        ) : (
-          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
-            {txQuery.data.map((tx) => (
-              <li
-                key={tx.id}
-                className="flex items-start justify-between gap-3 px-4 py-3"
+      {/* Acquisition */}
+      <Section title="Acquisition">
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Field label="Statut">
+            {LAND_ACQUISITION_STATUS_LABELS[land.acquisition_status]}
+          </Field>
+          <Field
+            label={
+              land.acquisition_status === "owned"
+                ? "Date d'acquisition"
+                : "Date prévue"
+            }
+          >
+            {land.acquisition_date
+              ? format(parseISO(land.acquisition_date), "d MMM yyyy", {
+                  locale: fr,
+                })
+              : "—"}
+          </Field>
+          <Field
+            label={
+              land.acquisition_status === "owned" ? "Prix d'achat" : "Prix prévu"
+            }
+          >
+            {land.acquisition_amount != null && land.acquisition_currency ? (
+              <MoneyDisplay
+                money={money(
+                  land.acquisition_amount,
+                  land.acquisition_currency as CurrencyCode,
+                )}
+                size="base"
+                showPivotEquivalent={false}
+              />
+            ) : (
+              "—"
+            )}
+          </Field>
+          <Field label="Vendeur">
+            {land.seller ? (
+              <Link
+                href={`/persons/${land.seller.id}`}
+                className="text-blue-600 hover:underline"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm">
-                    {format(parseISO(tx.occurred_at), "d MMM yyyy", {
-                      locale: fr,
-                    })}
+                {land.seller.full_name}
+              </Link>
+            ) : (
+              "—"
+            )}
+          </Field>
+        </dl>
+      </Section>
+
+      {/* Ventes */}
+      <Section
+        title="Ventes"
+        count={sales.length}
+        action={
+          remainingSurface > 0 ? (
+            <Button size="sm" onClick={() => setNewSaleOpen(true)}>
+              <Plus />
+              Nouvelle vente
+            </Button>
+          ) : (
+            <Badge variant="outline" className="text-[10px]">
+              Tout vendu
+            </Badge>
+          )
+        }
+      >
+        {salesQuery.isLoading ? (
+          <Skeleton className="h-20 w-full" />
+        ) : sales.length === 0 ? (
+          <EmptyMini text="Aucune vente enregistrée pour ce terrain." />
+        ) : (
+          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            {sales.map((sale) => {
+              const remaining = saleRemainingQuery.data?.[sale.id];
+              const currency = sale.price_per_m2_currency as CurrencyCode;
+              const hasRemaining =
+                remaining && remaining.remaining_amount > 0;
+              return (
+                <li key={sale.id} className="flex flex-col gap-2 px-4 py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">
+                          {sale.buyer?.full_name ?? "Sans acheteur"}
+                        </span>
+                        <StatusBadge
+                          status={
+                            sale.status === "settled"
+                              ? "settled"
+                              : sale.status === "blocked"
+                                ? "blocked"
+                                : "active"
+                          }
+                        />
+                      </div>
+                      <div className="mt-0.5 text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                        {sale.surface_m2.toLocaleString("fr-FR")} m² ·{" "}
+                        {format(parseISO(sale.sale_date), "d MMM yyyy", {
+                          locale: fr,
+                        })}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <MoneyDisplay
+                        money={money(sale.total_amount, currency)}
+                        size="base"
+                        showPivotEquivalent={false}
+                      />
+                      {hasRemaining ? (
+                        <div className="mt-0.5 text-xs text-amber-700 tabular-nums dark:text-amber-300">
+                          Reste{" "}
+                          <MoneyDisplay
+                            money={money(
+                              remaining.remaining_amount,
+                              currency,
+                            )}
+                            size="sm"
+                            showPivotEquivalent={false}
+                            className="inline-flex"
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-300">
+                          ✓ Soldée
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {tx.notes ? (
-                    <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                      {tx.notes}
+                  <div className="flex flex-wrap gap-2">
+                    {hasRemaining ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPayingSale(sale)}
+                      >
+                        <Wallet />
+                        Encaisser
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditSale(sale)}
+                    >
+                      <Pencil />
+                      Modifier
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setConfirmDeleteSale(sale)}
+                    >
+                      <Trash2 className="text-red-500" />
+                      Supprimer
+                    </Button>
+                  </div>
+                  {sale.notes ? (
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {sale.notes}
                     </div>
                   ) : null}
-                </div>
-                <div className="flex items-center gap-3">
-                  <MoneyDisplay
-                    money={money(tx.amount, tx.currency as CurrencyCode)}
-                    size="base"
-                    showPivotEquivalent={false}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Supprimer ce paiement"
-                    onClick={() => onDeletePayment(tx.id)}
-                  >
-                    <Trash2 className="text-red-500" />
-                  </Button>
-                </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {sales.length > 0 ? (
+          <div className="mt-3 flex justify-end text-xs text-zinc-500 dark:text-zinc-400">
+            Total encaissé :{" "}
+            {Object.entries(totalCollected).map(([cur, amount], i) => (
+              <span key={cur} className="ml-2 font-medium tabular-nums">
+                {i > 0 ? "· " : ""}
+                <MoneyDisplay
+                  money={money(amount, cur as CurrencyCode)}
+                  size="sm"
+                  showPivotEquivalent={false}
+                  className="inline-flex"
+                />
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </Section>
+
+      {/* Dossiers admin */}
+      <Section
+        title="Dossiers"
+        count={dossiers.length}
+        action={
+          <Button
+            size="sm"
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/admin-files/new?land_id=${land.id}`} />}
+          >
+            <Plus />
+            Nouveau dossier
+          </Button>
+        }
+      >
+        {dossiersQuery.isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : dossiers.length === 0 ? (
+          <EmptyMini text="Aucun dossier rattaché à ce terrain." />
+        ) : (
+          <ul className="divide-y divide-zinc-200 overflow-hidden rounded-md border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+            {dossiers.map((d) => (
+              <li key={d.id}>
+                <Link
+                  href={`/admin-files/${d.id}`}
+                  className="flex items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FileText className="size-4 text-zinc-500" />
+                      <span className="font-medium">{d.title}</span>
+                      <StatusBadge
+                        status={
+                          d.status === "done"
+                            ? "done"
+                            : d.status === "blocked"
+                              ? "blocked"
+                              : d.status === "awaiting_docs"
+                                ? "awaiting_docs"
+                                : d.status === "awaiting_payment"
+                                  ? "awaiting_payment"
+                                  : "processing"
+                        }
+                      />
+                    </div>
+                    <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {ADMIN_FILE_TYPE_LABELS[d.type]}
+                    </div>
+                  </div>
+                  {d.total_cost_amount && d.total_cost_currency ? (
+                    <MoneyDisplay
+                      money={money(
+                        d.total_cost_amount,
+                        d.total_cost_currency as CurrencyCode,
+                      )}
+                      size="sm"
+                      showPivotEquivalent={false}
+                    />
+                  ) : null}
+                </Link>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </Section>
 
-      <LandPaymentDialog
-        project={project}
-        open={payOpen}
-        onOpenChange={setPayOpen}
+      {/* Notes */}
+      {land.notes ? (
+        <Section title="Notes">
+          <p className="text-sm whitespace-pre-line">{land.notes}</p>
+        </Section>
+      ) : null}
+
+      {/* Dialogs */}
+      <LandSaleDialog
+        landId={land.id}
+        availableSurfaceM2={remainingSurface}
+        open={newSaleOpen}
+        onOpenChange={setNewSaleOpen}
       />
+      {editSale ? (
+        <LandSaleDialog
+          landId={land.id}
+          availableSurfaceM2={remainingSurface}
+          initial={editSale}
+          open={editSale !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditSale(null);
+          }}
+        />
+      ) : null}
+      {payingSale ? (
+        <LandSalePaymentDialog
+          sale={payingSale}
+          open={payingSale !== null}
+          onOpenChange={(open) => {
+            if (!open) setPayingSale(null);
+          }}
+        />
+      ) : null}
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Supprimer ce projet ?</DialogTitle>
+            <DialogTitle>Supprimer ce terrain ?</DialogTitle>
             <DialogDescription>
-              Le projet sera masqué. Les paiements liés restent conservés dans
-              le journal des transactions.
+              Le terrain sera masqué. Les ventes/dossiers liés doivent être
+              supprimés au préalable.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
               Annuler
             </Button>
             <Button
               variant="destructive"
-              onClick={onDeleteProject}
-              disabled={deleteProjectMutation.isPending}
+              onClick={onDeleteLand}
+              disabled={deleteLandMutation.isPending}
             >
-              {deleteProjectMutation.isPending ? "Suppression…" : "Supprimer"}
+              {deleteLandMutation.isPending ? "Suppression…" : "Supprimer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmDeleteSale !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteSale(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer cette vente ?</DialogTitle>
+            <DialogDescription>
+              Les paiements liés restent conservés dans le journal des
+              transactions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDeleteSale(null)}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onDeleteSale}
+              disabled={deleteSaleMutation.isPending}
+            >
+              {deleteSaleMutation.isPending ? "Suppression…" : "Supprimer"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -277,13 +550,33 @@ export default function LandProjectDetailPage({ params }: PageProps) {
   );
 }
 
+function computeTotalCollected(
+  sales: LandSaleWithBuyer[],
+  remaining:
+    | Record<string, { currency: string; total_amount: number; remaining_amount: number }>
+    | undefined,
+): Record<string, Decimal> {
+  const out: Record<string, Decimal> = {};
+  for (const sale of sales) {
+    const cur = sale.price_per_m2_currency;
+    const row = remaining?.[sale.id];
+    const collected = row
+      ? new Decimal(row.total_amount).minus(row.remaining_amount)
+      : new Decimal(0);
+    out[cur] = (out[cur] ?? new Decimal(0)).plus(collected);
+  }
+  return out;
+}
+
 function SummaryCard({
   label,
   value,
+  sub,
   emphasis,
 }: {
   label: string;
-  value: ReturnType<typeof money>;
+  value: string;
+  sub?: string;
   emphasis?: boolean;
 }) {
   return (
@@ -296,30 +589,68 @@ function SummaryCard({
       <div className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
         {label}
       </div>
-      <div className="mt-1">
-        <MoneyDisplay money={value} size="xl" showPivotEquivalent={false} />
-      </div>
+      <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+      {sub ? (
+        <div className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {sub}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function DetailField({
-  label,
-  value,
-  className,
+function Section({
+  title,
+  count,
+  action,
+  children,
 }: {
-  label: string;
-  value: React.ReactNode;
-  className?: string;
+  title: string;
+  count?: number;
+  action?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <div className={className}>
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+          {title}
+          {count !== undefined && count > 0 ? (
+            <Badge variant="outline" className="text-[10px] font-normal">
+              {count}
+            </Badge>
+          ) : null}
+        </h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
       <dt className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 text-sm whitespace-pre-line text-zinc-900 dark:text-zinc-100">
-        {value}
+      <dd className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">
+        {children}
       </dd>
+    </div>
+  );
+}
+
+function EmptyMini({ text }: { text: string }) {
+  return (
+    <div className="rounded-md border border-dashed border-zinc-300 px-4 py-5 text-center text-sm text-zinc-500 dark:border-zinc-700">
+      {text}
     </div>
   );
 }

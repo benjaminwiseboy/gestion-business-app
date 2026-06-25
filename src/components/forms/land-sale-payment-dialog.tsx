@@ -28,32 +28,36 @@ import {
   type LandPaymentFormInput,
   type LandPaymentFormValues,
 } from "@/domain/validators";
-import { useCreateLandPayment } from "@/hooks/use-transactions";
+import { useCreateLandSalePayment } from "@/hooks/use-transactions";
 import type { Tables } from "@/lib/supabase/types";
 
-type LandProject = Tables<"land_projects">;
+type LandSale = Tables<"land_sales">;
 
-interface LandPaymentDialogProps {
-  project: Pick<
-    LandProject,
-    "id" | "client_person_id" | "total_amount" | "price_per_m2_currency"
+interface LandSalePaymentDialogProps {
+  sale: Pick<
+    LandSale,
+    | "id"
+    | "land_id"
+    | "buyer_person_id"
+    | "total_amount"
+    | "price_per_m2_currency"
   >;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function LandPaymentDialog({
-  project,
+export function LandSalePaymentDialog({
+  sale,
   open,
   onOpenChange,
-}: LandPaymentDialogProps) {
-  const mutation = useCreateLandPayment();
+}: LandSalePaymentDialogProps) {
+  const mutation = useCreateLandSalePayment();
 
   const form = useForm<LandPaymentFormInput, unknown, LandPaymentFormValues>({
     resolver: zodResolver(LandPaymentFormSchema),
     defaultValues: {
       amount: "",
-      currency: (project.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
+      currency: (sale.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
       occurred_at: new Date().toISOString().slice(0, 10),
       notes: "",
     },
@@ -63,12 +67,12 @@ export function LandPaymentDialog({
     if (open) {
       form.reset({
         amount: "",
-        currency: (project.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
+        currency: (sale.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
         occurred_at: new Date().toISOString().slice(0, 10),
         notes: "",
       });
     }
-  }, [open, project.price_per_m2_currency, form]);
+  }, [open, sale.price_per_m2_currency, form]);
 
   const currency = form.watch("currency");
   const errors = form.formState.errors;
@@ -76,7 +80,7 @@ export function LandPaymentDialog({
   async function onSubmit(parsed: LandPaymentFormValues) {
     try {
       await mutation.mutateAsync({
-        project,
+        sale,
         amount: parseFloat(parsed.amount),
         currency: parsed.currency,
         occurred_at: parsed.occurred_at,
@@ -93,10 +97,10 @@ export function LandPaymentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Saisir un paiement foncier</DialogTitle>
+          <DialogTitle>Encaisser un paiement</DialogTitle>
           <DialogDescription>
-            Le montant est déduit du total dû. Le statut du projet passe à «
-            Soldé » dès que le reste atteint 0.
+            Versement reçu de l&apos;acheteur pour cette vente. La vente passe
+            à « Soldée » quand le total dû est atteint.
           </DialogDescription>
         </DialogHeader>
 
@@ -106,11 +110,11 @@ export function LandPaymentDialog({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="land_amount">
+              <Label htmlFor="ls_pay_amount">
                 Montant <span className="text-red-500">*</span>
               </Label>
               <Input
-                id="land_amount"
+                id="ls_pay_amount"
                 type="text"
                 inputMode="decimal"
                 autoComplete="off"
@@ -148,11 +152,11 @@ export function LandPaymentDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="land_date">
+            <Label htmlFor="ls_pay_date">
               Date <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="land_date"
+              id="ls_pay_date"
               type="date"
               {...form.register("occurred_at")}
             />
@@ -164,9 +168,9 @@ export function LandPaymentDialog({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="land_notes">Notes</Label>
+            <Label htmlFor="ls_pay_notes">Notes</Label>
             <Textarea
-              id="land_notes"
+              id="ls_pay_notes"
               rows={2}
               placeholder="Mode de paiement, reçu, contexte..."
               {...form.register("notes")}

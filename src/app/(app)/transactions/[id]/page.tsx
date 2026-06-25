@@ -31,14 +31,14 @@ interface PageProps {
 
 const LINKED_ENTITY_ROUTES: Record<LinkedEntityType, string> = {
   loan: "/loans",
-  land_project: "/land",
+  land_sale: "/land",
   admin_file: "/admin-files",
   investment: "/investments",
 };
 
 const LINKED_ENTITY_LABELS: Record<LinkedEntityType, string> = {
   loan: "Prêt",
-  land_project: "Projet foncier",
+  land_sale: "Vente foncier",
   admin_file: "Dossier",
   investment: "Investissement",
 };

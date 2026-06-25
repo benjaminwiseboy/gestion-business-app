@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ import {
   useCreateAdminFile,
   useUpdateAdminFile,
 } from "@/hooks/use-admin-files";
+import { useLands } from "@/hooks/use-lands";
 import { usePersons } from "@/hooks/use-persons";
 import { QuickPersonDialog } from "@/components/forms/quick-person-dialog";
 import type { Tables } from "@/lib/supabase/types";
@@ -65,16 +66,21 @@ type QuickAddTarget = "beneficiary" | "surveyor" | null;
 
 export function AdminFileForm({ initial }: AdminFileFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createMutation = useCreateAdminFile();
   const updateMutation = useUpdateAdminFile();
   const personsQuery = usePersons();
+  const landsQuery = useLands();
   const [quickAddTarget, setQuickAddTarget] = useState<QuickAddTarget>(null);
+
+  const queryLandId = searchParams.get("land_id");
 
   const form = useForm<AdminFileFormInput, unknown, AdminFileFormValues>({
     resolver: zodResolver(AdminFileFormSchema),
     defaultValues: {
       title: initial?.title ?? "",
       type: initial?.type ?? "technical",
+      land_id: initial?.land_id ?? queryLandId ?? "",
       beneficiary_person_id: initial?.beneficiary_person_id ?? "",
       surveyor_person_id: initial?.surveyor_person_id ?? "",
       surface_m2: initial?.surface_m2 != null ? String(initial.surface_m2) : "",
@@ -93,6 +99,7 @@ export function AdminFileForm({ initial }: AdminFileFormProps) {
   const type = form.watch("type");
   const status = form.watch("status");
   const currency = form.watch("total_cost_currency");
+  const landId = form.watch("land_id");
   const beneficiaryId = form.watch("beneficiary_person_id");
   const surveyorId = form.watch("surveyor_person_id");
   const errors = form.formState.errors;
@@ -106,6 +113,7 @@ export function AdminFileForm({ initial }: AdminFileFormProps) {
       const payload = {
         title: parsed.title,
         type: parsed.type,
+        land_id: parsed.land_id,
         beneficiary_person_id: parsed.beneficiary_person_id,
         surveyor_person_id: parsed.surveyor_person_id,
         surface_m2: parsed.surface_m2 ? parseFloat(parsed.surface_m2) : null,
@@ -119,11 +127,19 @@ export function AdminFileForm({ initial }: AdminFileFormProps) {
       if (initial) {
         await updateMutation.mutateAsync({ id: initial.id, input: payload });
         toast.success("Dossier mis à jour");
-        router.push(`/admin-files/${initial.id}`);
+        router.push(
+          parsed.land_id
+            ? `/land/${parsed.land_id}`
+            : `/admin-files/${initial.id}`,
+        );
       } else {
         const created = await createMutation.mutateAsync(payload);
         toast.success("Dossier créé");
-        router.push(`/admin-files/${created.id}`);
+        router.push(
+          parsed.land_id
+            ? `/land/${parsed.land_id}`
+            : `/admin-files/${created.id}`,
+        );
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur inconnue");
@@ -147,6 +163,34 @@ export function AdminFileForm({ initial }: AdminFileFormProps) {
           placeholder="Ex: Titre foncier Lot 12 Cocody"
           {...form.register("title")}
         />
+      </Field>
+
+      <Field label="Terrain lié" error={errors.land_id?.message}>
+        <Select
+          value={landId ?? ""}
+          onValueChange={(value) => {
+            if (value !== null && value !== undefined)
+              form.setValue("land_id", value, { shouldValidate: true });
+          }}
+          disabled={landsQuery.isLoading}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue>
+              {landsLabel(
+                landId ?? "",
+                landsQuery.data,
+                landsQuery.isLoading,
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(landsQuery.data ?? []).map((l) => (
+              <SelectItem key={l.id} value={l.id}>
+                {l.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Field>
 
       <Field label="Type" required>
@@ -392,6 +436,21 @@ function personsLabel(
     );
   const p = persons?.find((p) => p.id === id);
   return p?.full_name ?? <span className="text-muted-foreground">Inconnu</span>;
+}
+
+function landsLabel(
+  id: string,
+  lands: { id: string; title: string }[] | undefined,
+  isLoading: boolean,
+) {
+  if (!id)
+    return (
+      <span className="text-muted-foreground">
+        {isLoading ? "Chargement…" : "Aucun (facultatif)"}
+      </span>
+    );
+  const l = lands?.find((l) => l.id === id);
+  return l?.title ?? <span className="text-muted-foreground">Inconnu</span>;
 }
 
 function Field({

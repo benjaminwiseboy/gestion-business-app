@@ -147,8 +147,8 @@ async function loadAlertsInput(
     loanRemaining,
     investments,
     adminFiles,
-    landProjects,
-    landRemaining,
+    landSales,
+    landSaleRemaining,
     transactions,
   ] = await Promise.all([
     supabase
@@ -170,12 +170,12 @@ async function loadAlertsInput(
       .eq("owner_id", ownerId)
       .is("deleted_at", null),
     supabase
-      .from("land_projects")
-      .select("*, client:persons(id, full_name)")
+      .from("land_sales")
+      .select("*, buyer:persons!land_sales_buyer_person_id_fkey(id, full_name)")
       .eq("owner_id", ownerId)
       .is("deleted_at", null),
     supabase
-      .from("land_project_remaining")
+      .from("land_sale_remaining")
       .select("*")
       .eq("owner_id", ownerId),
     supabase
@@ -185,18 +185,18 @@ async function loadAlertsInput(
       .is("deleted_at", null),
   ]);
 
-  const loanRemainingMap: Record<string, (typeof loanRemaining.data extends (infer T)[] | null ? T : never)> = {};
+  const loanRemainingMap: Record<string, AlertsInput["loanRemaining"][string]> = {};
   for (const row of loanRemaining.data ?? []) loanRemainingMap[row.loan_id] = row;
-  const landRemainingMap: Record<string, (typeof landRemaining.data extends (infer T)[] | null ? T : never)> = {};
-  for (const row of landRemaining.data ?? []) landRemainingMap[row.project_id] = row;
+  const landSaleRemainingMap: Record<string, AlertsInput["landSaleRemaining"][string]> = {};
+  for (const row of landSaleRemaining.data ?? []) landSaleRemainingMap[row.sale_id] = row;
 
   return {
     loans: (loans.data ?? []) as AlertsInput["loans"],
-    loanRemaining: loanRemainingMap as AlertsInput["loanRemaining"],
+    loanRemaining: loanRemainingMap,
     investments: (investments.data ?? []) as AlertsInput["investments"],
     adminFiles: (adminFiles.data ?? []) as AlertsInput["adminFiles"],
-    landProjects: (landProjects.data ?? []) as AlertsInput["landProjects"],
-    landRemaining: landRemainingMap as AlertsInput["landRemaining"],
+    landSales: (landSales.data ?? []) as AlertsInput["landSales"],
+    landSaleRemaining: landSaleRemainingMap,
     transactions: (transactions.data ?? []) as AlertsInput["transactions"],
   };
 }

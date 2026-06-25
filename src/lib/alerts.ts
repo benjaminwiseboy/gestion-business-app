@@ -13,7 +13,7 @@ import {
 import type { InvestmentWithCounterparty } from "@/hooks/use-investments";
 import type { LoanWithPerson } from "@/hooks/use-loans";
 import type { AdminFileWithPersons } from "@/hooks/use-admin-files";
-import type { LandProjectWithClient } from "@/hooks/use-land-projects";
+import type { LandSaleWithBuyer } from "@/hooks/use-land-sales";
 import type { TransactionWithPerson } from "@/hooks/use-transactions";
 import type { Views } from "@/lib/supabase/types";
 
@@ -72,8 +72,8 @@ export interface AlertsInput {
   loanRemaining: Record<string, Views<"loan_remaining">>;
   investments: InvestmentWithCounterparty[];
   adminFiles: AdminFileWithPersons[];
-  landProjects: LandProjectWithClient[];
-  landRemaining: Record<string, Views<"land_project_remaining">>;
+  landSales: LandSaleWithBuyer[];
+  landSaleRemaining: Record<string, Views<"land_sale_remaining">>;
   transactions: TransactionWithPerson[];
 }
 
@@ -268,16 +268,16 @@ function collectLandAlerts(
   out: Alert[],
   today: Date,
 ): void {
-  for (const project of input.landProjects) {
-    if (project.status !== "active") continue;
-    const row = input.landRemaining[project.id];
+  for (const sale of input.landSales) {
+    if (sale.status !== "active") continue;
+    const row = input.landSaleRemaining[sale.id];
     if (!row || row.remaining_amount <= 0) continue;
 
     const payments = input.transactions
       .filter(
         (t) =>
-          t.linked_entity_type === "land_project" &&
-          t.linked_entity_id === project.id &&
+          t.linked_entity_type === "land_sale" &&
+          t.linked_entity_id === sale.id &&
           t.kind === "land_payment",
       )
       .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
@@ -288,12 +288,12 @@ function collectLandAlerts(
     if (days < STALE_LAND_DAYS) continue;
 
     out.push({
-      id: `land-${project.id}`,
+      id: `land-sale-${sale.id}`,
       severity: "attention",
       domain: "land",
-      title: project.title,
+      title: sale.buyer?.full_name ?? "Vente sans acheteur",
       description: `Aucun paiement depuis ${days} j`,
-      href: `/land/${project.id}`,
+      href: `/land/${sale.land_id}`,
       sortDate: payments[0].occurred_at.slice(0, 10),
     });
   }

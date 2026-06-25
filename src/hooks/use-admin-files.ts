@@ -42,6 +42,12 @@ export function useAdminFiles() {
   });
 }
 
+export function useAdminFilesForLand(landId: string | null | undefined) {
+  const all = useAdminFiles();
+  const filtered = (all.data ?? []).filter((f) => f.land_id === landId);
+  return { ...all, data: landId ? filtered : [] };
+}
+
 export function useAdminFile(id: string | null | undefined) {
   return useQuery<AdminFileWithPersons | null>({
     queryKey: [...ADMIN_FILES_KEY, id],

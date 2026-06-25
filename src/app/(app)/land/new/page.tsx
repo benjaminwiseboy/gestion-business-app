@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { LandProjectForm } from "@/components/forms/land-project-form";
+import { LandForm } from "@/components/forms/land-form";
 
-export default function NewLandProjectPage() {
+export default function NewLandPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <div>
@@ -14,10 +14,10 @@ export default function NewLandProjectPage() {
           Foncier
         </Link>
         <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-          Nouveau projet foncier
+          Nouveau terrain
         </h2>
       </div>
-      <LandProjectForm />
+      <LandForm />
     </div>
   );
 }

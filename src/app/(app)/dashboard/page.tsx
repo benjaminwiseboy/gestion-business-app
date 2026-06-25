@@ -31,10 +31,7 @@ import {
   type InvestmentWithCounterparty,
 } from "@/hooks/use-investments";
 import { useAdminFiles } from "@/hooks/use-admin-files";
-import {
-  useLandProjects,
-  useLandRemaining,
-} from "@/hooks/use-land-projects";
+import { useAllLandSales, useLandSaleRemaining } from "@/hooks/use-land-sales";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useUserSettings } from "@/hooks/use-user-settings";
 import { money, type CurrencyCode } from "@/lib/money";
@@ -57,8 +54,8 @@ export default function DashboardPage() {
   const investmentsQuery = useInvestments();
   const investmentBalanceQuery = useInvestmentBalance();
   const adminFilesQuery = useAdminFiles();
-  const landProjectsQuery = useLandProjects();
-  const landRemainingQuery = useLandRemaining();
+  const landSalesQuery = useAllLandSales();
+  const landSaleRemainingQuery = useLandSaleRemaining();
 
   const isLoading =
     loansQuery.isLoading || remainingQuery.isLoading || settingsQuery.isLoading;
@@ -69,8 +66,8 @@ export default function DashboardPage() {
     investmentsQuery.isError ||
     investmentBalanceQuery.isError ||
     adminFilesQuery.isError ||
-    landProjectsQuery.isError ||
-    landRemainingQuery.isError;
+    landSalesQuery.isError ||
+    landSaleRemainingQuery.isError;
 
   const usdRate = settingsQuery.data?.usd_to_xaf_rate ?? 600;
   const loans = loansQuery.data ?? [];
@@ -78,8 +75,8 @@ export default function DashboardPage() {
   const investments = investmentsQuery.data ?? [];
   const investmentBalance = investmentBalanceQuery.data ?? {};
   const adminFiles = adminFilesQuery.data ?? [];
-  const landProjects = landProjectsQuery.data ?? [];
-  const landRemaining = landRemainingQuery.data ?? {};
+  const landSales = landSalesQuery.data ?? [];
+  const landSaleRemaining = landSaleRemainingQuery.data ?? {};
   const transactions = txQuery.data ?? [];
 
   const stats = useMemo(
@@ -97,8 +94,8 @@ export default function DashboardPage() {
         loanRemaining: remaining,
         investments,
         adminFiles,
-        landProjects,
-        landRemaining,
+        landSales,
+        landSaleRemaining,
         transactions,
       }),
     [
@@ -106,8 +103,8 @@ export default function DashboardPage() {
       remaining,
       investments,
       adminFiles,
-      landProjects,
-      landRemaining,
+      landSales,
+      landSaleRemaining,
       transactions,
     ],
   );

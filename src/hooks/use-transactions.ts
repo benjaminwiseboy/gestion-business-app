@@ -204,16 +204,17 @@ export function useCreateRepayment() {
 }
 
 /**
- * Insert a land_payment transaction linked to a project. Recomputes the
- * project's status to "settled" when remaining_amount hits 0.
+ * Insert a land_payment transaction linked to a sale. Recomputes the
+ * sale's status to "settled" when remaining_amount hits 0.
  */
-export function useCreateLandPayment() {
+export function useCreateLandSalePayment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      project: {
+      sale: {
         id: string;
-        client_person_id: string | null;
+        land_id: string;
+        buyer_person_id: string | null;
         total_amount: number;
         price_per_m2_currency: string;
       };
@@ -230,9 +231,9 @@ export function useCreateLandPayment() {
         currency: input.currency,
         exchange_rate_snapshot: input.exchange_rate_snapshot ?? 1,
         occurred_at: input.occurred_at,
-        person_id: input.project.client_person_id,
-        linked_entity_type: "land_project",
-        linked_entity_id: input.project.id,
+        person_id: input.sale.buyer_person_id,
+        linked_entity_type: "land_sale",
+        linked_entity_id: input.sale.id,
         notes: input.notes,
       };
       const { data: inserted, error: insertError } = await supabase
@@ -242,34 +243,36 @@ export function useCreateLandPayment() {
         .single();
       if (insertError) throw insertError;
 
-      // Recompute paid total in the project's own currency and flip
+      // Recompute paid total in the sale's own currency and flip
       // status to "settled" if the remaining balance is now <= 0.
       const { data: allTx } = await supabase
         .from("transactions")
         .select("amount,currency")
-        .eq("linked_entity_type", "land_project")
-        .eq("linked_entity_id", input.project.id)
+        .eq("linked_entity_type", "land_sale")
+        .eq("linked_entity_id", input.sale.id)
         .eq("kind", "land_payment")
         .is("deleted_at", null);
       const paid = (allTx ?? [])
-        .filter((t) => t.currency === input.project.price_per_m2_currency)
+        .filter((t) => t.currency === input.sale.price_per_m2_currency)
         .reduce((acc, t) => acc + Number(t.amount), 0);
       const nextStatus =
-        paid >= Number(input.project.total_amount) ? "settled" : "active";
+        paid >= Number(input.sale.total_amount) ? "settled" : "active";
       await supabase
-        .from("land_projects")
+        .from("land_sales")
         .update({ status: nextStatus })
-        .eq("id", input.project.id);
+        .eq("id", input.sale.id);
 
       return inserted;
     },
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
-      qc.invalidateQueries({ queryKey: ["land_project_remaining"] });
-      qc.invalidateQueries({ queryKey: ["land_projects"] });
+      qc.invalidateQueries({ queryKey: ["land_sale_remaining"] });
+      qc.invalidateQueries({ queryKey: ["land_sales"] });
       qc.invalidateQueries({
-        queryKey: ["land_projects", variables.project.id],
+        queryKey: ["land_sales", variables.sale.land_id],
       });
+      qc.invalidateQueries({ queryKey: ["land_inventory"] });
+      qc.invalidateQueries({ queryKey: ["lands"] });
     },
   });
 }
@@ -416,8 +419,10 @@ export function useDeleteTransaction() {
       qc.invalidateQueries({ queryKey: TRANSACTIONS_KEY });
       qc.invalidateQueries({ queryKey: LOAN_REMAINING_KEY });
       qc.invalidateQueries({ queryKey: LOANS_KEY });
-      qc.invalidateQueries({ queryKey: ["land_project_remaining"] });
-      qc.invalidateQueries({ queryKey: ["land_projects"] });
+      qc.invalidateQueries({ queryKey: ["land_sale_remaining"] });
+      qc.invalidateQueries({ queryKey: ["land_sales"] });
+      qc.invalidateQueries({ queryKey: ["lands"] });
+      qc.invalidateQueries({ queryKey: ["land_inventory"] });
       qc.invalidateQueries({ queryKey: ["admin_file_remaining"] });
       qc.invalidateQueries({ queryKey: ["admin_files"] });
       qc.invalidateQueries({ queryKey: ["investment_balance"] });

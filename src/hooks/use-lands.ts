@@ -10,75 +10,77 @@ import type {
   Views,
 } from "@/lib/supabase/types";
 
-type LandProject = Tables<"land_projects">;
-type LandRemaining = Views<"land_project_remaining">;
+type Land = Tables<"land_projects">;
+type LandInventory = Views<"land_inventory">;
 
-export type LandProjectWithClient = LandProject & {
-  client: { id: string; full_name: string } | null;
+export type LandWithSeller = Land & {
+  seller: { id: string; full_name: string } | null;
 };
 
-const LAND_PROJECTS_KEY = ["land_projects"] as const;
-const LAND_REMAINING_KEY = ["land_project_remaining"] as const;
+const LANDS_KEY = ["lands"] as const;
+const LAND_INVENTORY_KEY = ["land_inventory"] as const;
 
 function client() {
   return createClient();
 }
 
-export function useLandProjects() {
-  return useQuery<LandProjectWithClient[]>({
-    queryKey: LAND_PROJECTS_KEY,
+export function useLands() {
+  return useQuery<LandWithSeller[]>({
+    queryKey: LANDS_KEY,
     queryFn: async () => {
       const { data, error } = await client()
         .from("land_projects")
-        .select("*, client:persons(id, full_name)")
+        .select(
+          "*, seller:persons!land_projects_acquisition_seller_person_id_fkey(id, full_name)",
+        )
         .is("deleted_at", null)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as LandProjectWithClient[];
+      return (data ?? []) as unknown as LandWithSeller[];
     },
   });
 }
 
-export function useLandProject(id: string | null | undefined) {
-  return useQuery<LandProjectWithClient | null>({
-    queryKey: [...LAND_PROJECTS_KEY, id],
+export function useLand(id: string | null | undefined) {
+  return useQuery<LandWithSeller | null>({
+    queryKey: [...LANDS_KEY, id],
     enabled: Boolean(id),
     queryFn: async () => {
       if (!id) return null;
       const { data, error } = await client()
         .from("land_projects")
-        .select("*, client:persons(id, full_name)")
+        .select(
+          "*, seller:persons!land_projects_acquisition_seller_person_id_fkey(id, full_name)",
+        )
         .eq("id", id)
         .is("deleted_at", null)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as LandProjectWithClient | null;
+      return data as unknown as LandWithSeller | null;
     },
   });
 }
 
-export function useLandRemaining() {
-  return useQuery<Record<string, LandRemaining>>({
-    queryKey: LAND_REMAINING_KEY,
+export function useLandInventory() {
+  return useQuery<Record<string, LandInventory>>({
+    queryKey: LAND_INVENTORY_KEY,
     queryFn: async () => {
-      const { data, error } = await client()
-        .from("land_project_remaining")
-        .select("*");
+      const { data, error } = await client().from("land_inventory").select("*");
       if (error) throw error;
-      const map: Record<string, LandRemaining> = {};
-      for (const row of data ?? []) map[row.project_id] = row;
+      const map: Record<string, LandInventory> = {};
+      for (const row of data ?? []) map[row.land_id] = row;
       return map;
     },
   });
 }
 
-export function useLandRemainingFor(id: string | null | undefined) {
-  const all = useLandRemaining();
+export function useLandInventoryFor(id: string | null | undefined) {
+  const all = useLandInventory();
   const row = useMemo(() => (id ? all.data?.[id] : undefined), [all.data, id]);
   return { ...all, data: row };
 }
 
-export function useCreateLandProject() {
+export function useCreateLand() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (
@@ -93,13 +95,13 @@ export function useCreateLandProject() {
       return data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: LAND_PROJECTS_KEY });
-      qc.invalidateQueries({ queryKey: LAND_REMAINING_KEY });
+      qc.invalidateQueries({ queryKey: LANDS_KEY });
+      qc.invalidateQueries({ queryKey: LAND_INVENTORY_KEY });
     },
   });
 }
 
-export function useUpdateLandProject() {
+export function useUpdateLand() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -119,16 +121,14 @@ export function useUpdateLandProject() {
       return data;
     },
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: LAND_PROJECTS_KEY });
-      qc.invalidateQueries({
-        queryKey: [...LAND_PROJECTS_KEY, variables.id],
-      });
-      qc.invalidateQueries({ queryKey: LAND_REMAINING_KEY });
+      qc.invalidateQueries({ queryKey: LANDS_KEY });
+      qc.invalidateQueries({ queryKey: [...LANDS_KEY, variables.id] });
+      qc.invalidateQueries({ queryKey: LAND_INVENTORY_KEY });
     },
   });
 }
 
-export function useDeleteLandProject() {
+export function useDeleteLand() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
@@ -139,8 +139,8 @@ export function useDeleteLandProject() {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: LAND_PROJECTS_KEY });
-      qc.invalidateQueries({ queryKey: LAND_REMAINING_KEY });
+      qc.invalidateQueries({ queryKey: LANDS_KEY });
+      qc.invalidateQueries({ queryKey: LAND_INVENTORY_KEY });
     },
   });
 }
