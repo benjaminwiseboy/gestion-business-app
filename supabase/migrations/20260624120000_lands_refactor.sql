@@ -122,6 +122,11 @@ from public.land_projects p
 join _project_to_sale_mapping m on m.project_id = p.id;
 
 -- 4. Re-router les transactions land_payment vers la nouvelle vente ---
+-- La CHECK existante sur transactions.linked_entity_type n'inclut pas encore
+-- 'land_sale'. On la drop, on update, on la recrée avec la nouvelle liste.
+
+alter table public.transactions
+  drop constraint if exists transactions_linked_entity_type_check;
 
 update public.transactions t
 set
@@ -131,6 +136,13 @@ from _project_to_sale_mapping m
 where t.linked_entity_type = 'land_project'
   and t.linked_entity_id = m.project_id
   and t.kind = 'land_payment';
+
+alter table public.transactions
+  add constraint transactions_linked_entity_type_check
+  check (
+    linked_entity_type is null
+    or linked_entity_type in ('loan', 'land_sale', 'admin_file', 'investment')
+  );
 
 drop table _project_to_sale_mapping;
 
