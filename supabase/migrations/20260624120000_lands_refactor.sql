@@ -150,12 +150,14 @@ drop table _project_to_sale_mapping;
 
 drop view if exists public.land_project_remaining;
 
+-- Drop total_amount (colonne générée) en premier pour libérer la dépendance
+-- sur surface_m2 et price_per_m2_amount.
 alter table public.land_projects
+  drop column total_amount,
   drop column client_person_id,
   drop column surface_m2,
   drop column price_per_m2_amount,
-  drop column price_per_m2_currency,
-  drop column total_amount;
+  drop column price_per_m2_currency;
 
 -- 6. Lier admin_files à un terrain (optionnel) ------------------------
 
