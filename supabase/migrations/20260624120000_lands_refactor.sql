@@ -89,24 +89,16 @@ create trigger land_sales_audit
   for each row execute function public.audit_change();
 
 -- 3. Migration des ventes existantes -----------------------------------
-
--- Pour chaque land_project avec client → 1 nouvelle vente
-create temp table _project_to_sale_mapping (
-  project_id uuid not null,
-  sale_id uuid not null default gen_random_uuid()
-);
-
-insert into _project_to_sale_mapping (project_id)
-  select id from public.land_projects
-  where client_person_id is not null and deleted_at is null;
+-- Pour chaque land_project avec client → 1 nouvelle vente (id auto).
+-- Pas de TEMP TABLE car le SQL Editor Supabase ne la persiste pas toujours
+-- entre statements (pgBouncer / sessions).
 
 insert into public.land_sales (
-  id, owner_id, land_id, buyer_person_id, surface_m2,
+  owner_id, land_id, buyer_person_id, surface_m2,
   price_per_m2_amount, price_per_m2_currency, sale_date, status,
   notes, created_at, updated_at
 )
 select
-  m.sale_id,
   p.owner_id,
   p.id,
   p.client_person_id,
@@ -119,11 +111,12 @@ select
   p.created_at,
   p.updated_at
 from public.land_projects p
-join _project_to_sale_mapping m on m.project_id = p.id;
+where p.client_person_id is not null
+  and p.deleted_at is null;
 
 -- 4. Re-router les transactions land_payment vers la nouvelle vente ---
--- La CHECK existante sur transactions.linked_entity_type n'inclut pas encore
--- 'land_sale'. On la drop, on update, on la recrée avec la nouvelle liste.
+-- Mapping via land_id (chaque ancien projet → 1 vente, JOIN direct).
+-- Drop+recreate la CHECK pour autoriser 'land_sale'.
 
 alter table public.transactions
   drop constraint if exists transactions_linked_entity_type_check;
@@ -131,10 +124,10 @@ alter table public.transactions
 update public.transactions t
 set
   linked_entity_type = 'land_sale',
-  linked_entity_id = m.sale_id
-from _project_to_sale_mapping m
+  linked_entity_id = s.id
+from public.land_sales s
 where t.linked_entity_type = 'land_project'
-  and t.linked_entity_id = m.project_id
+  and t.linked_entity_id = s.land_id
   and t.kind = 'land_payment';
 
 alter table public.transactions
@@ -143,8 +136,6 @@ alter table public.transactions
     linked_entity_type is null
     or linked_entity_type in ('loan', 'land_sale', 'admin_file', 'investment')
   );
-
-drop table _project_to_sale_mapping;
 
 -- 5. Nettoyer land_projects des colonnes "vente" -----------------------
 
