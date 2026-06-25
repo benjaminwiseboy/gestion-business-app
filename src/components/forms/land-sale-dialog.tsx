@@ -34,6 +34,7 @@ import {
   useCreateLandSale,
   useUpdateLandSale,
 } from "@/hooks/use-land-sales";
+import { useCreateLandSalePayment } from "@/hooks/use-transactions";
 import { usePersons } from "@/hooks/use-persons";
 import { QuickPersonDialog } from "@/components/forms/quick-person-dialog";
 import { formatMoney, money } from "@/lib/money";
@@ -60,6 +61,7 @@ export function LandSaleDialog({
 }: LandSaleDialogProps) {
   const createMutation = useCreateLandSale();
   const updateMutation = useUpdateLandSale();
+  const initialPaymentMutation = useCreateLandSalePayment();
   const personsQuery = usePersons();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -77,24 +79,36 @@ export function LandSaleDialog({
   const priceStr = form.watch("price_per_m2_amount");
   const currency = form.watch("price_per_m2_currency");
   const status = form.watch("status");
+  const initialPaidStr = form.watch("initial_paid_amount");
   const errors = form.formState.errors;
 
   const surface = parseDec(surfaceStr);
   const price = parseDec(priceStr);
   const total =
     surface && price ? new Decimal(surface).mul(price) : null;
+  const initialPaid = parseDec(initialPaidStr);
 
   // Max surface available = current available + the surface this sale already
   // occupies (so editing doesn't double-count itself).
   const maxSurface =
     availableSurfaceM2 + (initial ? Number(initial.surface_m2) : 0);
 
-  const overLimit = surface !== null && surface > maxSurface + 0.0001;
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const overLimitSurface = surface !== null && surface > maxSurface + 0.0001;
+  const overLimitPayment =
+    initialPaid !== null && total !== null && initialPaid > total.toNumber() + 0.0001;
+
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    initialPaymentMutation.isPending;
 
   async function onSubmit(parsed: LandSaleFormValues) {
-    if (overLimit) {
+    if (overLimitSurface) {
       toast.error("Surface supérieure à la surface disponible");
+      return;
+    }
+    if (overLimitPayment) {
+      toast.error("L'acompte ne peut pas dépasser le total de la vente");
       return;
     }
     try {
@@ -112,7 +126,27 @@ export function LandSaleDialog({
         await updateMutation.mutateAsync({ id: initial.id, input: payload });
         toast.success("Vente mise à jour");
       } else {
-        await createMutation.mutateAsync(payload);
+        const created = await createMutation.mutateAsync(payload);
+        // Si un acompte initial est saisi, on enregistre un paiement
+        // immédiatement après la création de la vente.
+        const initialAmount = parsed.initial_paid_amount
+          ? parseFloat(parsed.initial_paid_amount)
+          : 0;
+        if (initialAmount > 0) {
+          await initialPaymentMutation.mutateAsync({
+            sale: {
+              id: created.id,
+              land_id: created.land_id,
+              buyer_person_id: created.buyer_person_id,
+              total_amount: Number(created.total_amount),
+              price_per_m2_currency: created.price_per_m2_currency,
+            },
+            amount: initialAmount,
+            currency: parsed.price_per_m2_currency,
+            occurred_at: parsed.sale_date,
+            notes: "Acompte initial",
+          });
+        }
         toast.success("Vente enregistrée");
       }
       onOpenChange(false);
@@ -200,7 +234,7 @@ export function LandSaleDialog({
                 <p className="text-xs text-red-600">
                   {errors.surface_m2.message}
                 </p>
-              ) : overLimit ? (
+              ) : overLimitSurface ? (
                 <p className="text-xs text-red-600">
                   Maximum {maxSurface.toLocaleString("fr-FR")} m²
                 </p>
@@ -271,10 +305,54 @@ export function LandSaleDialog({
 
           {total ? (
             <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-800/50">
-              Total :{" "}
+              Total vente :{" "}
               <span className="font-medium tabular-nums">
                 {formatMoney(money(total, currency))}
               </span>
+            </div>
+          ) : null}
+
+          {!initial ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="initial_paid">
+                Acompte déjà versé{" "}
+                <span className="text-xs font-normal text-zinc-500">
+                  (optionnel)
+                </span>
+              </Label>
+              <Input
+                id="initial_paid"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="0 — laisse vide si l'acheteur n'a rien versé"
+                className="tabular-nums"
+                {...form.register("initial_paid_amount")}
+              />
+              {errors.initial_paid_amount ? (
+                <p className="text-xs text-red-600">
+                  {errors.initial_paid_amount.message}
+                </p>
+              ) : overLimitPayment ? (
+                <p className="text-xs text-red-600">
+                  Ne peut pas dépasser le total ({total ? formatMoney(money(total, currency)) : "—"})
+                </p>
+              ) : initialPaid !== null && total !== null ? (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Reste à percevoir :{" "}
+                  <span className="font-medium tabular-nums">
+                    {formatMoney(
+                      money(total.minus(initialPaid).toNumber(), currency),
+                    )}
+                  </span>{" "}
+                  → créance enregistrée
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Si l&apos;acheteur paie en plusieurs fois, le reste devient
+                  une créance suivie via la vente.
+                </p>
+              )}
             </div>
           ) : null}
 
@@ -322,7 +400,10 @@ export function LandSaleDialog({
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending || overLimit}>
+            <Button
+              type="submit"
+              disabled={isPending || overLimitSurface || overLimitPayment}
+            >
               {isPending ? "Enregistrement…" : initial ? "Enregistrer" : "Créer la vente"}
             </Button>
           </DialogFooter>
@@ -358,6 +439,7 @@ function defaultValues(initial: LandSale | undefined): LandSaleFormInput {
       | "XAF"
       | "USD",
     sale_date: initial?.sale_date ?? new Date().toISOString().slice(0, 10),
+    initial_paid_amount: "",
     status: initial?.status ?? "active",
     notes: initial?.notes ?? "",
   };

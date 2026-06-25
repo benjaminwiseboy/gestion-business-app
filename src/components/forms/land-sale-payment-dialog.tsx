@@ -29,6 +29,7 @@ import {
   type LandPaymentFormValues,
 } from "@/domain/validators";
 import { useCreateLandSalePayment } from "@/hooks/use-transactions";
+import { formatMoney, money, type CurrencyCode } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/types";
 
 type LandSale = Tables<"land_sales">;
@@ -42,22 +43,27 @@ interface LandSalePaymentDialogProps {
     | "total_amount"
     | "price_per_m2_currency"
   >;
+  /** Reste à payer côté serveur (devise = sale.price_per_m2_currency). */
+  remainingAmount: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function LandSalePaymentDialog({
   sale,
+  remainingAmount,
   open,
   onOpenChange,
 }: LandSalePaymentDialogProps) {
   const mutation = useCreateLandSalePayment();
+  const saleCurrency =
+    (sale.price_per_m2_currency as CurrencyCode) ?? "XAF";
 
   const form = useForm<LandPaymentFormInput, unknown, LandPaymentFormValues>({
     resolver: zodResolver(LandPaymentFormSchema),
     defaultValues: {
       amount: "",
-      currency: (sale.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
+      currency: saleCurrency,
       occurred_at: new Date().toISOString().slice(0, 10),
       notes: "",
     },
@@ -67,17 +73,30 @@ export function LandSalePaymentDialog({
     if (open) {
       form.reset({
         amount: "",
-        currency: (sale.price_per_m2_currency as "XAF" | "USD") ?? "XAF",
+        currency: saleCurrency,
         occurred_at: new Date().toISOString().slice(0, 10),
         notes: "",
       });
     }
-  }, [open, sale.price_per_m2_currency, form]);
+  }, [open, saleCurrency, form]);
 
+  const amountStr = form.watch("amount");
   const currency = form.watch("currency");
   const errors = form.formState.errors;
 
+  // Validation : on ne contrôle l'excédent que si l'utilisateur paie dans la
+  // même devise que la vente (sinon conversion nécessaire, hors scope).
+  const amountNum = parseDec(amountStr);
+  const overLimit =
+    amountNum !== null &&
+    currency === saleCurrency &&
+    amountNum > remainingAmount + 0.0001;
+
   async function onSubmit(parsed: LandPaymentFormValues) {
+    if (overLimit) {
+      toast.error("Le paiement ne peut pas dépasser le reste à percevoir");
+      return;
+    }
     try {
       await mutation.mutateAsync({
         sale,
@@ -99,8 +118,11 @@ export function LandSalePaymentDialog({
         <DialogHeader>
           <DialogTitle>Encaisser un paiement</DialogTitle>
           <DialogDescription>
-            Versement reçu de l&apos;acheteur pour cette vente. La vente passe
-            à « Soldée » quand le total dû est atteint.
+            Reste à percevoir :{" "}
+            <strong>
+              {formatMoney(money(remainingAmount, saleCurrency))}
+            </strong>
+            . La vente passe à « Soldée » quand le total dû est atteint.
           </DialogDescription>
         </DialogHeader>
 
@@ -125,6 +147,10 @@ export function LandSalePaymentDialog({
               />
               {errors.amount ? (
                 <p className="text-xs text-red-600">{errors.amount.message}</p>
+              ) : overLimit ? (
+                <p className="text-xs text-red-600">
+                  Maximum {formatMoney(money(remainingAmount, saleCurrency))}
+                </p>
               ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
@@ -185,7 +211,10 @@ export function LandSalePaymentDialog({
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || overLimit}
+            >
               {mutation.isPending ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </DialogFooter>
@@ -193,4 +222,10 @@ export function LandSalePaymentDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function parseDec(v: string | undefined): number | null {
+  if (!v) return null;
+  const n = parseFloat(v.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }

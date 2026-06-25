@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
+import Decimal from "decimal.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,17 +20,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  LAND_ACQUISITION_STATUS_DESCRIPTIONS,
   LAND_ACQUISITION_STATUS_LABELS,
-  LAND_PROJECT_STATUS_LABELS,
   LandFormSchema,
   type LandAcquisitionStatusInput,
   type LandFormInput,
   type LandFormValues,
-  type LandProjectStatusInput,
 } from "@/domain/validators";
 import { useCreateLand, useUpdateLand } from "@/hooks/use-lands";
 import { usePersons } from "@/hooks/use-persons";
 import { QuickPersonDialog } from "@/components/forms/quick-person-dialog";
+import { formatMoney, money } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/types";
 
 type Land = Tables<"land_projects">;
@@ -43,8 +44,11 @@ const CURRENCY_LABELS: Record<string, string> = {
   USD: "USD",
 };
 
-const ACQUISITION_STATUSES: LandAcquisitionStatusInput[] = ["owned", "planned"];
-const STATUSES: LandProjectStatusInput[] = ["active", "settled", "blocked"];
+const ACQUISITION_STATUSES: LandAcquisitionStatusInput[] = [
+  "planned",
+  "owned",
+  "blocked",
+];
 
 export function LandForm({ initial }: LandFormProps) {
   const router = useRouter();
@@ -61,30 +65,32 @@ export function LandForm({ initial }: LandFormProps) {
       total_surface_m2: initial?.total_surface_m2
         ? String(initial.total_surface_m2)
         : "",
-      acquisition_status: initial?.acquisition_status ?? "owned",
-      acquisition_amount:
-        initial?.acquisition_amount != null
-          ? String(initial.acquisition_amount)
+      acquisition_status: initial?.acquisition_status ?? "planned",
+      acquisition_price_per_m2:
+        initial?.acquisition_price_per_m2 != null
+          ? String(initial.acquisition_price_per_m2)
           : "",
       acquisition_currency: (initial?.acquisition_currency ?? "XAF") as
         | "XAF"
         | "USD",
       acquisition_date: initial?.acquisition_date ?? "",
       acquisition_seller_person_id: initial?.acquisition_seller_person_id ?? "",
-      status: initial?.status ?? "active",
       notes: initial?.notes ?? "",
     },
   });
 
   const acquisitionStatus = form.watch("acquisition_status");
-  const status = form.watch("status");
   const currency = form.watch("acquisition_currency");
   const sellerId = form.watch("acquisition_seller_person_id");
+  const surfaceStr = form.watch("total_surface_m2");
+  const pricePerM2Str = form.watch("acquisition_price_per_m2");
   const errors = form.formState.errors;
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
     form.formState.isSubmitting;
+
+  const totalAcquisition = computeTotal(surfaceStr, pricePerM2Str);
 
   async function onSubmit(parsed: LandFormValues) {
     try {
@@ -93,13 +99,12 @@ export function LandForm({ initial }: LandFormProps) {
         location: parsed.location,
         total_surface_m2: parseFloat(parsed.total_surface_m2),
         acquisition_status: parsed.acquisition_status,
-        acquisition_amount: parsed.acquisition_amount
-          ? parseFloat(parsed.acquisition_amount)
+        acquisition_price_per_m2: parsed.acquisition_price_per_m2
+          ? parseFloat(parsed.acquisition_price_per_m2)
           : null,
         acquisition_currency: parsed.acquisition_currency,
         acquisition_date: parsed.acquisition_date,
         acquisition_seller_person_id: parsed.acquisition_seller_person_id,
-        status: parsed.status,
         notes: parsed.notes,
       };
       if (initial) {
@@ -147,53 +152,33 @@ export function LandForm({ initial }: LandFormProps) {
         />
       </Field>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Field
-          label="Surface totale (m²)"
-          required
-          error={errors.total_surface_m2?.message}
-          htmlFor="total_surface_m2"
-        >
-          <Input
-            id="total_surface_m2"
-            type="text"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="500"
-            className="tabular-nums"
-            {...form.register("total_surface_m2")}
-          />
-        </Field>
-        <Field label="Statut" required>
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              if (value)
-                form.setValue("status", value as LandProjectStatusInput, {
-                  shouldValidate: true,
-                });
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue>{LAND_PROJECT_STATUS_LABELS[status]}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {LAND_PROJECT_STATUS_LABELS[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+      <Field
+        label="Surface totale (m²)"
+        required
+        error={errors.total_surface_m2?.message}
+        htmlFor="total_surface_m2"
+      >
+        <Input
+          id="total_surface_m2"
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="500"
+          className="tabular-nums"
+          {...form.register("total_surface_m2")}
+        />
+      </Field>
 
       <fieldset className="flex flex-col gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
         <legend className="px-1 text-xs font-medium tracking-wide text-zinc-500 uppercase">
           Acquisition
         </legend>
 
-        <Field label="Statut d'acquisition" required>
+        <Field
+          label="Statut du terrain"
+          required
+          helpText={LAND_ACQUISITION_STATUS_DESCRIPTIONS[acquisitionStatus]}
+        >
           <Select
             value={acquisitionStatus}
             onValueChange={(value) => {
@@ -223,21 +208,21 @@ export function LandForm({ initial }: LandFormProps) {
         <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
           <Field
             label={
-              acquisitionStatus === "owned"
-                ? "Prix d'achat"
-                : "Prix prévu d'achat"
+              acquisitionStatus === "planned"
+                ? "Prix prévu au m²"
+                : "Prix d'achat au m²"
             }
-            error={errors.acquisition_amount?.message}
-            htmlFor="acquisition_amount"
+            error={errors.acquisition_price_per_m2?.message}
+            htmlFor="acquisition_price_per_m2"
           >
             <Input
-              id="acquisition_amount"
+              id="acquisition_price_per_m2"
               type="text"
               inputMode="decimal"
               autoComplete="off"
               placeholder="Optionnel"
               className="tabular-nums"
-              {...form.register("acquisition_amount")}
+              {...form.register("acquisition_price_per_m2")}
             />
           </Field>
           <Field label="Devise" required>
@@ -263,11 +248,20 @@ export function LandForm({ initial }: LandFormProps) {
           </Field>
         </div>
 
+        {totalAcquisition ? (
+          <div className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+            Prix d&apos;acquisition total :{" "}
+            <span className="font-medium tabular-nums">
+              {formatMoney(money(totalAcquisition, currency))}
+            </span>
+          </div>
+        ) : null}
+
         <Field
           label={
-            acquisitionStatus === "owned"
-              ? "Date d'acquisition"
-              : "Date prévue d'acquisition"
+            acquisitionStatus === "planned"
+              ? "Date prévue d'acquisition"
+              : "Date d'acquisition"
           }
           error={errors.acquisition_date?.message}
           htmlFor="acquisition_date"
@@ -280,7 +274,7 @@ export function LandForm({ initial }: LandFormProps) {
         </Field>
 
         <Field
-          label={acquisitionStatus === "owned" ? "Vendeur" : "Vendeur (prévu)"}
+          label={acquisitionStatus === "planned" ? "Vendeur (prévu)" : "Vendeur"}
           error={errors.acquisition_seller_person_id?.message}
         >
           <div className="flex gap-2">
@@ -359,6 +353,18 @@ export function LandForm({ initial }: LandFormProps) {
   );
 }
 
+function computeTotal(
+  surface: string | undefined,
+  pricePerM2: string | undefined,
+): Decimal | null {
+  if (!surface || !pricePerM2) return null;
+  const s = parseFloat(surface.replace(",", "."));
+  const p = parseFloat(pricePerM2.replace(",", "."));
+  if (!Number.isFinite(s) || !Number.isFinite(p) || s <= 0 || p <= 0)
+    return null;
+  return new Decimal(s).mul(p);
+}
+
 function personsLabel(
   id: string,
   persons: { id: string; full_name: string }[] | undefined,
@@ -379,12 +385,14 @@ function Field({
   required,
   error,
   htmlFor,
+  helpText,
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string;
   htmlFor?: string;
+  helpText?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -394,6 +402,9 @@ function Field({
         {required ? <span className="ml-1 text-red-500">*</span> : null}
       </Label>
       {children}
+      {helpText ? (
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{helpText}</p>
+      ) : null}
       {error ? (
         <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
       ) : null}

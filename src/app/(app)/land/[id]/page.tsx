@@ -145,18 +145,7 @@ export default function LandDetailPage({ params }: PageProps) {
               {land.title}
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <StatusBadge
-                status={
-                  land.status === "settled"
-                    ? "settled"
-                    : land.status === "blocked"
-                      ? "blocked"
-                      : "active"
-                }
-              />
-              <Badge variant="outline" className="text-[10px] font-normal">
-                {LAND_ACQUISITION_STATUS_LABELS[land.acquisition_status]}
-              </Badge>
+              <StatusBadge status={land.acquisition_status} />
               {land.location ? (
                 <span className="text-xs text-zinc-500">{land.location}</span>
               ) : null}
@@ -222,18 +211,37 @@ export default function LandDetailPage({ params }: PageProps) {
           </Field>
           <Field
             label={
-              land.acquisition_status === "owned" ? "Prix d'achat" : "Prix prévu"
+              land.acquisition_status === "owned"
+                ? "Prix d'achat au m²"
+                : "Prix prévu au m²"
             }
           >
-            {land.acquisition_amount != null && land.acquisition_currency ? (
-              <MoneyDisplay
-                money={money(
-                  land.acquisition_amount,
-                  land.acquisition_currency as CurrencyCode,
-                )}
-                size="base"
-                showPivotEquivalent={false}
-              />
+            {land.acquisition_price_per_m2 != null &&
+            land.acquisition_currency ? (
+              <div className="flex flex-col gap-0.5">
+                <MoneyDisplay
+                  money={money(
+                    land.acquisition_price_per_m2,
+                    land.acquisition_currency as CurrencyCode,
+                  )}
+                  size="base"
+                  showPivotEquivalent={false}
+                />
+                <span className="text-xs text-zinc-500 tabular-nums dark:text-zinc-400">
+                  Total :{" "}
+                  <MoneyDisplay
+                    money={money(
+                      new Decimal(land.acquisition_price_per_m2)
+                        .mul(land.total_surface_m2)
+                        .toNumber(),
+                      land.acquisition_currency as CurrencyCode,
+                    )}
+                    size="sm"
+                    showPivotEquivalent={false}
+                    className="inline-flex"
+                  />
+                </span>
+              </div>
             ) : (
               "—"
             )}
@@ -484,6 +492,10 @@ export default function LandDetailPage({ params }: PageProps) {
       {payingSale ? (
         <LandSalePaymentDialog
           sale={payingSale}
+          remainingAmount={Number(
+            saleRemainingQuery.data?.[payingSale.id]?.remaining_amount ??
+              payingSale.total_amount,
+          )}
           open={payingSale !== null}
           onOpenChange={(open) => {
             if (!open) setPayingSale(null);

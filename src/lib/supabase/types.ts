@@ -10,9 +10,8 @@ export type LoanDirection = "lent" | "borrowed";
 export type LoanStatus = "active" | "repaid" | "overdue" | "partial";
 export type InterestType = "simple" | "compound" | "none";
 export type PersonKind = "individual" | "entity";
-export type LandProjectStatus = "active" | "settled" | "blocked";
 export type LandSaleStatus = "active" | "settled" | "blocked";
-export type LandAcquisitionStatus = "owned" | "planned";
+export type LandAcquisitionStatus = "planned" | "owned" | "blocked";
 export type AdminFileType =
   | "technical"
   | "title"
@@ -365,11 +364,10 @@ export interface Database {
           location: string | null;
           total_surface_m2: number;
           acquisition_status: LandAcquisitionStatus;
-          acquisition_amount: number | null;
+          acquisition_price_per_m2: number | null;
           acquisition_currency: string | null;
           acquisition_date: string | null;
           acquisition_seller_person_id: string | null;
-          status: LandProjectStatus;
           notes: string | null;
         } & Timestamps &
           SoftDelete;
@@ -380,11 +378,10 @@ export interface Database {
           location?: string | null;
           total_surface_m2: number;
           acquisition_status?: LandAcquisitionStatus;
-          acquisition_amount?: number | null;
+          acquisition_price_per_m2?: number | null;
           acquisition_currency?: string | null;
           acquisition_date?: string | null;
           acquisition_seller_person_id?: string | null;
-          status?: LandProjectStatus;
           notes?: string | null;
         };
         Update: {
@@ -392,11 +389,10 @@ export interface Database {
           location?: string | null;
           total_surface_m2?: number;
           acquisition_status?: LandAcquisitionStatus;
-          acquisition_amount?: number | null;
+          acquisition_price_per_m2?: number | null;
           acquisition_currency?: string | null;
           acquisition_date?: string | null;
           acquisition_seller_person_id?: string | null;
-          status?: LandProjectStatus;
           notes?: string | null;
           deleted_at?: string | null;
         };

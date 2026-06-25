@@ -13,7 +13,9 @@ export type Status =
   | "awaiting_payment"
   | "done"
   | "closed"
-  | "lost";
+  | "lost"
+  | "planned"
+  | "owned";
 
 const CONFIG: Record<Status, { label: string; className: string }> = {
   active: {
@@ -68,6 +70,16 @@ const CONFIG: Record<Status, { label: string; className: string }> = {
   lost: {
     label: "Perdu",
     className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+  },
+  planned: {
+    label: "En cours d'acquisition",
+    className:
+      "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  },
+  owned: {
+    label: "Acquis",
+    className:
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
   },
 };
 

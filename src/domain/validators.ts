@@ -119,7 +119,7 @@ export type TransactionKindInput = z.infer<typeof TransactionKindSchema>;
 export const TRANSACTION_KIND_LABELS: Record<TransactionKindInput, string> = {
   loan_disbursement: "Décaissement de prêt",
   repayment: "Remboursement",
-  land_payment: "Paiement foncier",
+  land_payment: "Acompte sur vente foncier",
   admin_payment: "Paiement dossier",
   investment_in: "Investissement entrant",
   investment_out: "Distribution",
@@ -145,19 +145,11 @@ export type RepaymentFormValues = z.output<typeof RepaymentFormSchema>;
 
 // Land (Terrain) -------------------------------------------------------------
 
-export const LandProjectStatusSchema = z.enum(["active", "settled", "blocked"]);
-export type LandProjectStatusInput = z.infer<typeof LandProjectStatusSchema>;
-
-export const LAND_PROJECT_STATUS_LABELS: Record<
-  LandProjectStatusInput,
-  string
-> = {
-  active: "Actif",
-  settled: "Soldé",
-  blocked: "Bloqué",
-};
-
-export const LandAcquisitionStatusSchema = z.enum(["owned", "planned"]);
+export const LandAcquisitionStatusSchema = z.enum([
+  "planned",
+  "owned",
+  "blocked",
+]);
 export type LandAcquisitionStatusInput = z.infer<
   typeof LandAcquisitionStatusSchema
 >;
@@ -166,8 +158,18 @@ export const LAND_ACQUISITION_STATUS_LABELS: Record<
   LandAcquisitionStatusInput,
   string
 > = {
-  owned: "Possédé",
-  planned: "À acquérir",
+  planned: "En cours d'acquisition",
+  owned: "Acquis",
+  blocked: "Bloqué",
+};
+
+export const LAND_ACQUISITION_STATUS_DESCRIPTIONS: Record<
+  LandAcquisitionStatusInput,
+  string
+> = {
+  planned: "Terrain en négociation, pas encore à toi",
+  owned: "Terrain officiellement à toi (acquis)",
+  blocked: "Litige, contentieux, saisie ou attente d'autorisation",
 };
 
 const optionalUuidStr = z
@@ -208,11 +210,10 @@ export const LandFormSchema = z.object({
     "Surface invalide",
   ),
   acquisition_status: LandAcquisitionStatusSchema,
-  acquisition_amount: optionalDecimalStr,
+  acquisition_price_per_m2: optionalDecimalStr,
   acquisition_currency: CurrencyCodeSchema,
   acquisition_date: optionalDateStr,
   acquisition_seller_person_id: optionalUuidStr,
-  status: LandProjectStatusSchema,
   notes: emptyToNull,
 });
 export type LandFormInput = z.input<typeof LandFormSchema>;
@@ -241,6 +242,8 @@ export const LandSaleFormSchema = z.object({
   ),
   price_per_m2_currency: CurrencyCodeSchema,
   sale_date: z.string().date("Date de vente requise"),
+  /** Acompte déjà versé (optionnel). Crée une transaction land_payment. */
+  initial_paid_amount: optionalDecimalStr,
   status: LandSaleStatusSchema,
   notes: emptyToNull,
 });

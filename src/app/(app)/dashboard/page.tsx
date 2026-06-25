@@ -31,7 +31,11 @@ import {
   type InvestmentWithCounterparty,
 } from "@/hooks/use-investments";
 import { useAdminFiles } from "@/hooks/use-admin-files";
-import { useAllLandSales, useLandSaleRemaining } from "@/hooks/use-land-sales";
+import {
+  useAllLandSales,
+  useLandSaleRemaining,
+  type LandSaleWithBuyer,
+} from "@/hooks/use-land-sales";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useUserSettings } from "@/hooks/use-user-settings";
 import { money, type CurrencyCode } from "@/lib/money";
@@ -80,8 +84,8 @@ export default function DashboardPage() {
   const transactions = txQuery.data ?? [];
 
   const stats = useMemo(
-    () => computeStats(loans, remaining, usdRate),
-    [loans, remaining, usdRate],
+    () => computeStats(loans, remaining, landSales, landSaleRemaining, usdRate),
+    [loans, remaining, landSales, landSaleRemaining, usdRate],
   );
   const investmentStats = useMemo(
     () => computeInvestmentStats(investments, investmentBalance, usdRate),
@@ -150,7 +154,11 @@ export default function DashboardPage() {
               label="Total créances"
               icon={<ArrowUpRight className="size-4 text-emerald-600" />}
               valueXof={stats.receivablesXof}
-              description={`${stats.activeLent} prêt(s) actif(s)`}
+              description={
+                stats.activeLandSales > 0
+                  ? `${stats.activeLent} prêt(s) + ${stats.activeLandSales} vente(s) foncier`
+                  : `${stats.activeLent} prêt(s) actif(s)`
+              }
             />
             <SummaryCard
               label="Total dettes"
@@ -229,12 +237,15 @@ interface Stats {
   repaymentRatio: number;
   activeLent: number;
   activeBorrowed: number;
+  activeLandSales: number;
   totalLoans: number;
 }
 
 function computeStats(
   loans: LoanWithPerson[],
   remaining: Record<string, Views<"loan_remaining">>,
+  landSales: LandSaleWithBuyer[],
+  landSaleRemaining: Record<string, Views<"land_sale_remaining">>,
   usdRate: number,
 ): Stats {
   let receivables = new Decimal(0);
@@ -243,6 +254,7 @@ function computeStats(
   let totalRepaid = new Decimal(0);
   let activeLent = 0;
   let activeBorrowed = 0;
+  let activeLandSales = 0;
 
   for (const loan of loans) {
     const currency = loan.principal_currency as CurrencyCode;
@@ -265,6 +277,21 @@ function computeStats(
     }
   }
 
+  // Les ventes foncier non soldées comptent comme créances (l'acheteur
+  // doit le reste à payer).
+  for (const sale of landSales) {
+    if (sale.status === "settled") continue;
+    const row = landSaleRemaining[sale.id];
+    if (!row) continue;
+    const currency = sale.price_per_m2_currency as CurrencyCode;
+    const rate = currency === "USD" ? usdRate : 1;
+    const remainingXof = new Decimal(row.remaining_amount).mul(rate);
+    if (remainingXof.gt(0)) {
+      receivables = receivables.plus(remainingXof);
+      activeLandSales += 1;
+    }
+  }
+
   const repaymentRatio = totalPrincipal.isZero()
     ? 0
     : totalRepaid.div(totalPrincipal).toNumber();
@@ -276,6 +303,7 @@ function computeStats(
     repaymentRatio: Math.min(1, Math.max(0, repaymentRatio)),
     activeLent,
     activeBorrowed,
+    activeLandSales,
     totalLoans: loans.length,
   };
 }

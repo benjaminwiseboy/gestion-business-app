@@ -24,18 +24,18 @@ import {
 } from "@/hooks/use-lands";
 import {
   LAND_ACQUISITION_STATUS_LABELS,
-  type LandProjectStatusInput,
+  type LandAcquisitionStatusInput,
 } from "@/domain/validators";
 import type { Views } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
 
-type StatusFilter = "all" | LandProjectStatusInput;
+type StatusFilter = "all" | LandAcquisitionStatusInput;
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "Tous statuts" },
-  { value: "active", label: "Actifs" },
-  { value: "settled", label: "Soldés" },
-  { value: "blocked", label: "Bloqués" },
+  { value: "planned", label: LAND_ACQUISITION_STATUS_LABELS.planned },
+  { value: "owned", label: LAND_ACQUISITION_STATUS_LABELS.owned },
+  { value: "blocked", label: LAND_ACQUISITION_STATUS_LABELS.blocked },
 ];
 
 export default function LandPage() {
@@ -48,7 +48,8 @@ export default function LandPage() {
     const all = landsQuery.data ?? [];
     const q = search.trim().toLowerCase();
     return all.filter((l) => {
-      if (statusFilter !== "all" && l.status !== statusFilter) return false;
+      if (statusFilter !== "all" && l.acquisition_status !== statusFilter)
+        return false;
       if (q) {
         const inTitle = l.title.toLowerCase().includes(q);
         const inLocation = l.location?.toLowerCase().includes(q) ?? false;
@@ -90,7 +91,7 @@ export default function LandPage() {
             setStatusFilter((value as StatusFilter) ?? "all")
           }
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-52">
             <SelectValue>
               {STATUS_OPTIONS.find((o) => o.value === statusFilter)?.label}
             </SelectValue>
@@ -162,18 +163,7 @@ function LandsList({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{l.title}</span>
-                  <StatusBadge
-                    status={
-                      l.status === "settled"
-                        ? "settled"
-                        : l.status === "blocked"
-                          ? "blocked"
-                          : "active"
-                    }
-                  />
-                  <Badge variant="outline" className="text-[10px] font-normal">
-                    {LAND_ACQUISITION_STATUS_LABELS[l.acquisition_status]}
-                  </Badge>
+                  <StatusBadge status={l.acquisition_status} />
                 </div>
                 <div className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
                   {l.location ?? "—"}
